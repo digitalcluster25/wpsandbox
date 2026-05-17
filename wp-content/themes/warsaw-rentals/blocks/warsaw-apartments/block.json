@@ -1,0 +1,63 @@
+{
+    "apiVersion": 2,
+    "name": "warsaw-rentals/apartments",
+    "title": "Warsaw Apartments",
+    "description": "Список квартир для аренды",
+    "category": "warsaw-rentals",
+    "icon": "admin-home",
+    "textdomain": "warsaw-rentals",
+    "attributes": {
+        "eyebrow": {
+            "type": "string",
+            "default": "Наши предложения"
+        },
+        "title": {
+            "type": "string",
+            "default": "Популярные квартиры"
+        },
+        "desc": {
+            "type": "string",
+            "default": "Выбери из более чем 200 проверенных квартир во всех районах Варшавы."
+        },
+        "apartments": {
+            "type": "array",
+            "default": [
+                {
+                    "emoji": "🏙️",
+                    "title": "Студия на Śródmieście",
+                    "location": "ул. Marszałkowska 12",
+                    "price": "3 200 zł/мес",
+                    "rooms": "1",
+                    "area": "32 m²",
+                    "floor": "4 эт."
+                },
+                {
+                    "emoji": "🌳",
+                    "title": "2-комн. на Mokotów",
+                    "location": "ул. Puławska 48",
+                    "price": "4 500 zł/мес",
+                    "rooms": "2",
+                    "area": "55 m²",
+                    "floor": "2 эт."
+                },
+                {
+                    "emoji": "🏛️",
+                    "title": "3-комн. на Żoliborz",
+                    "location": "ул. Mickiewicza 7",
+                    "price": "6 200 zł/мес",
+                    "rooms": "3",
+                    "area": "78 m²",
+                    "floor": "3 эт."
+                }
+            ]
+        }
+    },
+    "supports": {
+        "html": false,
+        "align": [
+            "wide",
+            "full"
+        ]
+    },
+    "render": "file:./render.php"
+}

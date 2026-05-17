@@ -1,0 +1,44 @@
+services:
+  wp_db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wp_user
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - wp_db_data:/var/lib/mysql
+    networks:
+      - internal
+
+  wordpress:
+    image: wordpress:6.7-php8.2-apache
+    restart: unless-stopped
+    depends_on:
+      - wp_db
+    environment:
+      WORDPRESS_DB_HOST: wp_db:3306
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wp_user
+      WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
+      WORDPRESS_DEBUG: 0
+    volumes:
+      - wp_core:/var/www/html
+      - ./wp-content:/var/www/html/wp-content
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.wpsandbox.rule=Host(`wpsandbox.spaces.community`)
+      - traefik.http.routers.wpsandbox.entrypoints=websecure
+      - traefik.http.routers.wpsandbox.tls.certresolver=letsencrypt
+      - traefik.http.services.wpsandbox.loadbalancer.server.port=80
+    networks:
+      - internal
+
+volumes:
+  wp_db_data:
+  wp_core:
+
+networks:
+  internal:
+    driver: bridge

@@ -1,0 +1,56 @@
+{
+    "apiVersion": 2,
+    "name": "warsaw-rentals/features",
+    "title": "Warsaw Features",
+    "description": "Секция преимуществ",
+    "category": "warsaw-rentals",
+    "icon": "star-filled",
+    "textdomain": "warsaw-rentals",
+    "attributes": {
+        "eyebrow": {
+            "type": "string",
+            "default": "Почему мы"
+        },
+        "title": {
+            "type": "string",
+            "default": "Аренда без стресса"
+        },
+        "desc": {
+            "type": "string",
+            "default": "Мы берём на себя всё — от поиска до заключения договора."
+        },
+        "items": {
+            "type": "array",
+            "default": [
+                {
+                    "icon": "📍",
+                    "title": "Центр Варшавы",
+                    "desc": "Все квартиры в радиусе 3 км от Рыночной площади. Метро в шаговой доступности."
+                },
+                {
+                    "icon": "💳",
+                    "title": "Честная цена",
+                    "desc": "Никаких агентских сборов и скрытых платежей. Цена на сайте — финальная."
+                },
+                {
+                    "icon": "⚡",
+                    "title": "Быстрый въезд",
+                    "desc": "Подписание договора и получение ключей за 24 часа после одобрения."
+                },
+                {
+                    "icon": "🔧",
+                    "title": "Поддержка 24/7",
+                    "desc": "Служба технической поддержки работает круглосуточно без выходных."
+                }
+            ]
+        }
+    },
+    "supports": {
+        "html": false,
+        "align": [
+            "wide",
+            "full"
+        ]
+    },
+    "render": "file:./render.php"
+}

@@ -1,0 +1,35 @@
+{
+    "apiVersion": 2,
+    "name": "warsaw-rentals/cta",
+    "title": "Warsaw CTA",
+    "description": "Секция призыва к действию",
+    "category": "warsaw-rentals",
+    "icon": "megaphone",
+    "textdomain": "warsaw-rentals",
+    "attributes": {
+        "title": {
+            "type": "string",
+            "default": "Готов к переезду в Варшаву?"
+        },
+        "desc": {
+            "type": "string",
+            "default": "Оставь заявку и мы подберём квартиру под твой бюджет в течение 24 часов."
+        },
+        "btnText": {
+            "type": "string",
+            "default": "Оставить заявку"
+        },
+        "btn2Text": {
+            "type": "string",
+            "default": "Позвонить нам"
+        }
+    },
+    "supports": {
+        "html": false,
+        "align": [
+            "wide",
+            "full"
+        ]
+    },
+    "render": "file:./render.php"
+}

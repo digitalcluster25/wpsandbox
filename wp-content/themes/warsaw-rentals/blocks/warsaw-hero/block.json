@@ -1,0 +1,68 @@
+{
+    "apiVersion": 2,
+    "name": "warsaw-rentals/hero",
+    "title": "Warsaw Hero",
+    "description": "Hero секция для лендинга аренды квартир",
+    "category": "warsaw-rentals",
+    "icon": "building",
+    "keywords": [
+        "hero",
+        "warsaw",
+        "аренда"
+    ],
+    "textdomain": "warsaw-rentals",
+    "attributes": {
+        "badge": {
+            "type": "string",
+            "default": "📍 Варшава · Аренда квартир"
+        },
+        "title": {
+            "type": "string",
+            "default": "Найди идеальную квартиру в Варшаве"
+        },
+        "subtitle": {
+            "type": "string",
+            "default": "Проверенные квартиры в центре Варшавы. Без скрытых платежей. Въезд с первого дня."
+        },
+        "ctaText": {
+            "type": "string",
+            "default": "Смотреть квартиры"
+        },
+        "cta2Text": {
+            "type": "string",
+            "default": "Узнать цены"
+        },
+        "stat1N": {
+            "type": "string",
+            "default": "200+"
+        },
+        "stat1L": {
+            "type": "string",
+            "default": "квартир"
+        },
+        "stat2N": {
+            "type": "string",
+            "default": "5 лет"
+        },
+        "stat2L": {
+            "type": "string",
+            "default": "на рынке"
+        },
+        "stat3N": {
+            "type": "string",
+            "default": "98%"
+        },
+        "stat3L": {
+            "type": "string",
+            "default": "довольных жильцов"
+        }
+    },
+    "supports": {
+        "html": false,
+        "align": [
+            "wide",
+            "full"
+        ]
+    },
+    "render": "file:./render.php"
+}
