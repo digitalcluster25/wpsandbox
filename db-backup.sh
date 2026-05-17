@@ -4,15 +4,16 @@ BACKUP_DIR=/docker/wpsandbox/db-backups
 PREV_HASH_FILE=$BACKUP_DIR/.prev_hash
 REPO=/docker/wpsandbox
 
-# Дамп без временной метки gzip (-n) для корректного сравнения хэшей
+# Дамп БД
 DUMP=$(docker exec wpsandbox-wp_db-1 mysqldump   -u root -p9g5tJeSQ8GJUF1YwvGkM wordpress 2>/dev/null)
 
-NEW_HASH=$(echo "$DUMP" | md5sum | cut -d' ' -f1)
+# Хэш без строк с временными метками (они меняются каждый раз)
+NEW_HASH=$(echo "$DUMP" | grep -v '^-- Dump completed' | grep -v '^-- MySQL dump' | md5sum | cut -d' ' -f1)
 PREV_HASH=$(cat $PREV_HASH_FILE 2>/dev/null || echo '')
 
 cd $REPO
 
-# Изменения в файлах (tracked)
+# Изменения в файлах
 FILES_CHANGED=$(git status --porcelain | wc -l)
 
 # Ничего не изменилось — выходим
@@ -20,10 +21,9 @@ if [ "$NEW_HASH" = "$PREV_HASH" ] && [ "$FILES_CHANGED" -eq 0 ]; then
   exit 0
 fi
 
-CHANGES=
+CHANGES=""
 DATE=$(date +%Y-%m-%d_%H-%M)
 
-# БД изменилась — сохраняем
 if [ "$NEW_HASH" != "$PREV_HASH" ]; then
   echo "$DUMP" | gzip -n > $BACKUP_DIR/wordpress_$DATE.sql.gz
   echo $NEW_HASH > $PREV_HASH_FILE
