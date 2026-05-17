@@ -11,3 +11,4 @@ wp-content/wp-cache-config.php
 
 # OS
 .DS_Store
+wp-content/ai1wm-backups/
