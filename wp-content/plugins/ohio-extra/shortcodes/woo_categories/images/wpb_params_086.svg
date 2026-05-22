@@ -1,0 +1,9 @@
+<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path opacity="0.15" d="M58 10C64.6274 10 70 15.3726 70 22L70 58C70 64.6274 64.6274 70 58 70L24 70L24 10L58 10Z" fill="#415FB3"/>
+<rect x="10" y="34" width="24" height="2" rx="1" fill="#415FB3"/>
+<g opacity="0.5">
+<rect x="48" y="41" width="24" height="2" rx="1" transform="rotate(180 48 41)" fill="#415FB3"/>
+<rect x="22" y="41" width="12" height="2" rx="1" transform="rotate(180 22 41)" fill="#415FB3"/>
+</g>
+<rect opacity="0.5" x="10" y="44" width="24" height="2" rx="1" fill="#415FB3"/>
+</svg>
