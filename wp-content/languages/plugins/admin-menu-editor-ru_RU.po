@@ -1,0 +1,115 @@
+# Translation of Plugins - Admin Menu Editor - Stable (latest release) in Russian
+# This file is distributed under the same license as the Plugins - Admin Menu Editor - Stable (latest release) package.
+msgid ""
+msgstr ""
+"PO-Revision-Date: 2026-02-20 15:23:38+0000\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n % 10 == 1 && n % 100 != 11) ? 0 : ((n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? 1 : 2);\n"
+"X-Generator: GlotPress/4.0.3\n"
+"Language: ru\n"
+"Project-Id-Version: Plugins - Admin Menu Editor - Stable (latest release)\n"
+
+#: modules/content-permissions/policy.php:796
+msgid "objects"
+msgstr "объекты"
+
+#: modules/plugin-visibility/plugin-visibility.php:57
+msgid "Customized plugin list is disabled for your account."
+msgstr "Для Вашей учетной записи отключен список настраиваемых плагинов."
+
+#: modules/content-permissions/policy.php:697
+msgctxt "content permissions: action name"
+msgid "Publish"
+msgstr "Опубликовать"
+
+#: modules/content-permissions/policy.php:688
+msgctxt "content permissions: action name"
+msgid "Delete"
+msgstr "Удалить"
+
+#: modules/content-permissions/policy.php:679
+msgctxt "content permissions: action name"
+msgid "Edit"
+msgstr "Редактировать"
+
+#: modules/content-permissions/policy.php:656
+msgctxt "content permissions: action name"
+msgid "Read"
+msgstr "Прочитать"
+
+#: modules/content-permissions/metabox-template.php:335
+msgctxt "content permissions: redirect URL field label"
+msgid "URL:"
+msgstr "URL:"
+
+#: modules/content-permissions/metabox-template.php:45
+msgctxt "Loading message in the content permissions meta box"
+msgid "Loading..."
+msgstr "Загрузка…"
+
+#: includes/menu-editor-core.php:460
+msgid "You will still see the default admin menu content."
+msgstr "Вы по-прежнему будете видеть содержимое стандартного админ меню."
+
+#: includes/menu-editor-core.php:461
+msgid "Custom admin menu is disabled for your account."
+msgstr "Пользовательское меню администратора отключено для вашей учетной записи."
+
+#: modules/content-permissions/content-permissions.php:180
+msgid "Disable content permissions enforcement"
+msgstr "Отключить разрешения контента принудительно"
+
+#: modules/content-permissions/content-permissions.php:182
+msgid "You can still edit post and page permissions, but they won't have any effect. Useful for troubleshooting."
+msgstr "Вы по-прежнему можете редактировать права доступа к записям и страницам, но это не будет иметь никакого эффекта. Полезно для устранения неполадок."
+
+#: modules/content-permissions/content-permissions.php:191
+msgid "Detect post type capabilities by checking them with a non-existent user"
+msgstr "Определить возможности типов записей, проверив их у несуществующего пользователя"
+
+#: modules/content-permissions/content-permissions.php:193
+msgid "This usually produces more accurate results, but it can cause errors in some plugins and themes. If you see errors in the post editor, try disabling this option."
+msgstr "Обычно это дает более точные результаты, но может вызывать ошибки в некоторых плагинах и темах. Если вы видите ошибки в редакторе, попробуйте отключить эту опцию."
+
+#: modules/actor-selector/actor-selector.php:57
+msgid "You don't have permission to use Admin Menu Editor Pro."
+msgstr "У вас нет разрешения на использование Admin Menu Editor Pro."
+
+#: modules/actor-selector/actor-selector.php:54
+msgid "Access denied. Invalid nonce."
+msgstr "В доступе отказано. Недействительный одноразовый номер."
+
+#: includes/shadow_plugin_framework.php:308
+msgid "Settings"
+msgstr "Настройки"
+
+#: includes/menu-editor-core.php:3388
+msgid "Settings saved."
+msgstr "Настройки сохранены."
+
+#. Author of the plugin
+#: menu-editor.php
+msgid "Janis Elsts"
+msgstr "Janis Elsts"
+
+#. Description of the plugin
+#: menu-editor.php
+msgid "Lets you directly edit the WordPress admin menu. You can re-order, hide or rename existing menus, add custom menus and more."
+msgstr "Позволяет непосредственно редактировать меню администратора WordPress. Вы можете переуказать, скрыть или переименовать существующие меню, добавить пользовательские меню и многое другое."
+
+#. Plugin Name of the plugin
+#: menu-editor.php
+msgid "Admin Menu Editor"
+msgstr "Admin Menu Editor"
+
+#. Plugin URI of the plugin
+#: menu-editor.php
+msgid "http://w-shadow.com/blog/2008/12/20/admin-menu-editor-for-wordpress/"
+msgstr "http://w-shadow.com/blog/2008/12/20/admin-menu-editor-for-wordpress/"
+
+#. Author URI of the plugin
+#: menu-editor.php
+msgid "http://w-shadow.com/blog/"
+msgstr "http://w-shadow.com/blog/"
