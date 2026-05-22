@@ -2483,9 +2483,7 @@ var _default = exports["default"] = /*#__PURE__*/function (_elementorModules$Mod
         persistence: 'localStorage',
         autocapture: false,
         flags: true,
-        api_hosts: {
-          flags: 'https://api-eu.mixpanel.com'
-        },
+        api_host: 'https://api-eu.mixpanel.com',
         loaded: onLoaded
       });
     }
