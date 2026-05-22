@@ -1,0 +1,237 @@
+# Copyright (C) 2023 Colabrio
+# This file is distributed under the same license as the Ohio Portfolio plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: Ohio Portfolio 1.1.3\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/ohio-portfolio\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2023-11-24T18:29:23+02:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.9.0\n"
+"X-Domain: ohio-portfolio\n"
+
+#. Plugin Name of the plugin
+msgid "Ohio Portfolio"
+msgstr ""
+
+#. Plugin URI of the plugin
+#. Author URI of the plugin
+msgid "https://clbthemes.com"
+msgstr ""
+
+#. Description of the plugin
+msgid "Supercharge your WordPress site with extended portfolio features."
+msgstr ""
+
+#. Author of the plugin
+msgid "Colabrio"
+msgstr ""
+
+#: ohio-portfolio.php:37
+#: ohio-portfolio.php:39
+#: ohio-portfolio.php:72
+msgid "Portfolio"
+msgstr ""
+
+#: ohio-portfolio.php:38
+msgid "Project"
+msgstr ""
+
+#: ohio-portfolio.php:40
+msgid "All Projects"
+msgstr ""
+
+#: ohio-portfolio.php:41
+msgid "Add New"
+msgstr ""
+
+#: ohio-portfolio.php:42
+msgid "Add New Portfolio Project"
+msgstr ""
+
+#: ohio-portfolio.php:43
+msgid "Edit Project"
+msgstr ""
+
+#: ohio-portfolio.php:44
+msgid "New Portfolio Project"
+msgstr ""
+
+#: ohio-portfolio.php:45
+msgid "View Project"
+msgstr ""
+
+#: ohio-portfolio.php:46
+msgid "Search Projects"
+msgstr ""
+
+#: ohio-portfolio.php:47
+msgid "No projects found"
+msgstr ""
+
+#: ohio-portfolio.php:48
+msgid "No projects found in Trash"
+msgstr ""
+
+#: ohio-portfolio.php:49
+#: ohio-portfolio.php:60
+msgid "Parent Portfolio:"
+msgstr ""
+
+#: ohio-portfolio.php:50
+msgid "Featured image for this project"
+msgstr ""
+
+#: ohio-portfolio.php:51
+msgid "Set featured image for this project"
+msgstr ""
+
+#: ohio-portfolio.php:52
+msgid "Remove featured image for this project"
+msgstr ""
+
+#: ohio-portfolio.php:53
+msgid "Use featured image for this project"
+msgstr ""
+
+#: ohio-portfolio.php:54
+msgid "Portfolio projects archive"
+msgstr ""
+
+#: ohio-portfolio.php:55
+msgid "Insert into project"
+msgstr ""
+
+#: ohio-portfolio.php:56
+msgid "Upload to this project"
+msgstr ""
+
+#: ohio-portfolio.php:57
+msgid "Filter projects"
+msgstr ""
+
+#: ohio-portfolio.php:58
+msgid "Portfolio projects list navigation"
+msgstr ""
+
+#: ohio-portfolio.php:59
+msgid "Portfolio projects list"
+msgstr ""
+
+#: ohio-portfolio.php:74
+msgid "Portfolio post type for ohio theme."
+msgstr ""
+
+#: ohio-portfolio.php:97
+msgctxt "taxonomy general name"
+msgid "Portfolio categories"
+msgstr ""
+
+#: ohio-portfolio.php:98
+msgctxt "taxonomy singular name"
+msgid "Portfolio category"
+msgstr ""
+
+#: ohio-portfolio.php:99
+msgid "Search Categories"
+msgstr ""
+
+#: ohio-portfolio.php:100
+msgid "Popular Categories"
+msgstr ""
+
+#: ohio-portfolio.php:101
+#: ohio-portfolio.php:112
+msgid "Categories"
+msgstr ""
+
+#: ohio-portfolio.php:104
+msgid "Edit Category"
+msgstr ""
+
+#: ohio-portfolio.php:105
+msgid "Update Category"
+msgstr ""
+
+#: ohio-portfolio.php:106
+msgid "Add New Category"
+msgstr ""
+
+#: ohio-portfolio.php:107
+msgid "New Portfolio Category"
+msgstr ""
+
+#: ohio-portfolio.php:108
+msgid "Separate categories with commas"
+msgstr ""
+
+#: ohio-portfolio.php:109
+msgid "Add or remove categories"
+msgstr ""
+
+#: ohio-portfolio.php:110
+msgid "Choose from the most used categories"
+msgstr ""
+
+#: ohio-portfolio.php:111
+msgid "No categories found."
+msgstr ""
+
+#: ohio-portfolio.php:129
+msgctxt "taxonomy general name"
+msgid "Portfolio tags"
+msgstr ""
+
+#: ohio-portfolio.php:130
+msgctxt "taxonomy singular name"
+msgid "Portfolio tag"
+msgstr ""
+
+#: ohio-portfolio.php:131
+msgid "Search Tags"
+msgstr ""
+
+#: ohio-portfolio.php:132
+msgid "Popular Tags"
+msgstr ""
+
+#: ohio-portfolio.php:133
+#: ohio-portfolio.php:144
+msgid "Tags"
+msgstr ""
+
+#: ohio-portfolio.php:136
+msgid "Edit Tag"
+msgstr ""
+
+#: ohio-portfolio.php:137
+msgid "Update Tag"
+msgstr ""
+
+#: ohio-portfolio.php:138
+msgid "Add New Tag"
+msgstr ""
+
+#: ohio-portfolio.php:139
+msgid "New Portfolio Tag"
+msgstr ""
+
+#: ohio-portfolio.php:140
+msgid "Separate tags with commas"
+msgstr ""
+
+#: ohio-portfolio.php:141
+msgid "Add or remove tags"
+msgstr ""
+
+#: ohio-portfolio.php:142
+msgid "Choose from the most used tags"
+msgstr ""
+
+#: ohio-portfolio.php:143
+msgid "No tags found."
+msgstr ""
