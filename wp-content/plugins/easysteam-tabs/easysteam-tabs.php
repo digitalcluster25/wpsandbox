@@ -240,8 +240,6 @@ add_filter('woocommerce_dropdown_variation_attribute_options_html', function($ht
         $chip_label = esc_html($label);
         if ($delta > 0) {
             $chip_label .= ' <span class="hws-chip-price">+' . wp_kses_post(wc_price($delta)) . '</span>';
-        } elseif (!empty($value['is_default'])) {
-            $chip_label .= ' <span class="hws-chip-default">база</span>';
         }
 
         $is_selected = $selected === $label || (!$selected && !empty($value['is_default']));
@@ -258,6 +256,23 @@ add_action('wp_footer', function() {
     }
     ?>
     <style>
+        .variations_form.cart .variations {
+            border-top: 1px solid rgba(17, 24, 39, 0.12);
+            border-bottom: 1px solid rgba(17, 24, 39, 0.12);
+            padding: 24px 0 18px;
+            margin: 24px 0;
+        }
+        .variations_form.cart .variation {
+            margin-bottom: 20px;
+        }
+        .variations_form.cart .variation label {
+            display: block;
+            margin: 0 0 10px;
+            color: #4b4b48;
+            font-size: 17px;
+            line-height: 1.25;
+            font-weight: 600;
+        }
         .hws-variation-select-wrap select {
             position: absolute;
             width: 1px;
@@ -268,39 +283,83 @@ add_action('wp_footer', function() {
         .hws-variation-chips {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 8px;
+            gap: 10px;
+            margin-top: 0;
         }
         .hws-variation-chip {
             border: 1px solid rgba(17, 24, 39, 0.18);
-            background: #fff;
-            color: #111827;
-            border-radius: 4px;
-            padding: 9px 12px;
-            font-size: 14px;
+            background: transparent;
+            color: #111111;
+            border-radius: 18px;
+            padding: 10px 16px;
+            font-size: 15px;
             line-height: 1.2;
             text-align: left;
             cursor: pointer;
-            transition: border-color .15s ease, background .15s ease, color .15s ease;
+            min-height: 44px;
+            transition: border-color .15s ease, box-shadow .15s ease, color .15s ease, background .15s ease;
         }
         .hws-variation-chip:hover {
-            border-color: #111827;
+            border-color: rgba(17, 24, 39, 0.45);
+            color: #111111;
         }
         .hws-variation-chip.is-selected {
-            background: #111827;
+            background: transparent;
             border-color: #111827;
-            color: #fff;
+            color: #111111;
+            box-shadow: inset 0 0 0 2px #fff, 0 0 0 2px #111827;
         }
-        .hws-chip-price,
-        .hws-chip-default {
+        .hws-chip-price {
             display: inline-block;
             margin-left: 6px;
             font-size: 12px;
-            opacity: .78;
+            color: #6b8e23;
+            white-space: nowrap;
+        }
+        .hws-variation-chip.is-selected .hws-chip-price {
+            color: #557316;
+        }
+        .variations_form.cart .reset_variations {
+            display: inline-flex !important;
+            align-items: center;
+            gap: 8px;
+            margin-top: 2px;
+            color: #2f2f2d;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .variations_form.cart .reset_variations:before {
+            content: none;
+        }
+        .variations_form.cart .reset_variations .icon,
+        .variations_form.cart .reset_variations svg,
+        .variations_form.cart .reset_variations i {
+            margin-right: 4px;
+        }
+        .variations_form.cart .reset_variations:empty:before {
+            content: "×";
+            font-size: 28px;
+            line-height: 1;
+            font-weight: 400;
+        }
+        .variations_form.cart .woocommerce-variation-add-to-cart {
+            border-top: 0 !important;
+            padding-top: 0 !important;
+        }
+        .variations_form.cart .single_variation_wrap {
+            border-top: 0 !important;
+            padding-top: 18px;
+        }
+        .variations_form.cart .woocommerce-variation {
+            border: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }
         @media (max-width: 640px) {
             .hws-variation-chip {
                 flex: 1 1 100%;
+                justify-content: center;
+                text-align: center;
             }
         }
     </style>
@@ -330,6 +389,13 @@ add_action('wp_footer', function() {
             if (!wrap) return;
             wrap.querySelectorAll('.hws-variation-chip').forEach(function(chip) {
                 chip.classList.toggle('is-selected', chip.getAttribute('data-hws-value') === select.value);
+            });
+        });
+
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.reset_variations')) return;
+            document.querySelectorAll('.hws-variation-chip').forEach(function(chip) {
+                chip.classList.remove('is-selected');
             });
         });
     </script>
