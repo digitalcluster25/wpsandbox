@@ -210,3 +210,142 @@ function easysteam_tab_advantages() {
     global $product;
     echo '<div class="easysteam-tab-content">' . wp_kses_post(get_field('advantages', $product->get_id())) . '</div>';
 }
+
+add_filter('woocommerce_dropdown_variation_attribute_options_html', function($html, $args) {
+    $product = $args['product'] ?? null;
+    if (!$product || !($product instanceof WC_Product)) {
+        return $html;
+    }
+
+    $payload = json_decode((string) get_post_meta($product->get_id(), '_hws_source_payload', true), true);
+    if (!is_array($payload) || empty($payload['option_groups'])) {
+        return $html;
+    }
+
+    $attribute = (string) ($args['attribute'] ?? '');
+    $group = easysteam_find_option_group($payload, $attribute);
+    if (!$group) {
+        return $html;
+    }
+
+    $selected = (string) ($args['selected'] ?? '');
+    $chips = '<div class="hws-variation-chips" data-hws-attribute="' . esc_attr($attribute) . '">';
+    foreach (($group['values'] ?? []) as $value) {
+        $label = trim((string) ($value['name'] ?? ''));
+        if (!$label) {
+            continue;
+        }
+
+        $delta = isset($value['delta_price']) ? (float) $value['delta_price'] : 0;
+        $chip_label = esc_html($label);
+        if ($delta > 0) {
+            $chip_label .= ' <span class="hws-chip-price">+' . wp_kses_post(wc_price($delta)) . '</span>';
+        } elseif (!empty($value['is_default'])) {
+            $chip_label .= ' <span class="hws-chip-default">база</span>';
+        }
+
+        $is_selected = $selected === $label || (!$selected && !empty($value['is_default']));
+        $chips .= '<button type="button" class="hws-variation-chip' . ($is_selected ? ' is-selected' : '') . '" data-hws-value="' . esc_attr($label) . '">' . $chip_label . '</button>';
+    }
+    $chips .= '</div>';
+
+    return '<div class="hws-variation-select-wrap">' . $html . $chips . '</div>';
+}, 20, 2);
+
+add_action('wp_footer', function() {
+    if (!is_product()) {
+        return;
+    }
+    ?>
+    <style>
+        .hws-variation-select-wrap select {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .hws-variation-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .hws-variation-chip {
+            border: 1px solid rgba(17, 24, 39, 0.18);
+            background: #fff;
+            color: #111827;
+            border-radius: 4px;
+            padding: 9px 12px;
+            font-size: 14px;
+            line-height: 1.2;
+            text-align: left;
+            cursor: pointer;
+            transition: border-color .15s ease, background .15s ease, color .15s ease;
+        }
+        .hws-variation-chip:hover {
+            border-color: #111827;
+        }
+        .hws-variation-chip.is-selected {
+            background: #111827;
+            border-color: #111827;
+            color: #fff;
+        }
+        .hws-chip-price,
+        .hws-chip-default {
+            display: inline-block;
+            margin-left: 6px;
+            font-size: 12px;
+            opacity: .78;
+        }
+        @media (max-width: 640px) {
+            .hws-variation-chip {
+                flex: 1 1 100%;
+            }
+        }
+    </style>
+    <script>
+        document.addEventListener('click', function(event) {
+            var chip = event.target.closest('.hws-variation-chip');
+            if (!chip) return;
+
+            var wrap = chip.closest('.hws-variation-select-wrap');
+            if (!wrap) return;
+
+            var select = wrap.querySelector('select');
+            if (!select) return;
+
+            select.value = chip.getAttribute('data-hws-value') || '';
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+
+            wrap.querySelectorAll('.hws-variation-chip').forEach(function(item) {
+                item.classList.toggle('is-selected', item === chip);
+            });
+        });
+
+        document.addEventListener('change', function(event) {
+            if (!event.target.matches('.hws-variation-select-wrap select')) return;
+            var select = event.target;
+            var wrap = select.closest('.hws-variation-select-wrap');
+            if (!wrap) return;
+            wrap.querySelectorAll('.hws-variation-chip').forEach(function(chip) {
+                chip.classList.toggle('is-selected', chip.getAttribute('data-hws-value') === select.value);
+            });
+        });
+    </script>
+    <?php
+});
+
+function easysteam_find_option_group($payload, $attribute) {
+    $attribute = urldecode((string) $attribute);
+    foreach (($payload['option_groups'] ?? []) as $group) {
+        $name = (string) ($group['name'] ?? '');
+        if (!$name) {
+            continue;
+        }
+        if ($attribute === $name || sanitize_title($name) === $attribute || sanitize_title($name) === sanitize_title($attribute)) {
+            return $group;
+        }
+    }
+    return null;
+}
