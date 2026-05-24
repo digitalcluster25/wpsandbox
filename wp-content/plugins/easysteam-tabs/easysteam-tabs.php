@@ -116,7 +116,6 @@ add_filter('woocommerce_product_tabs', function($tabs) {
 
 function easysteam_build_info_tabs($payload) {
     $tabs = [];
-    $general_groups = ['Основная информация', 'Основные характеристики', 'Общие характеристики'];
     $specs = $payload['raw_data']['detail']['specs'] ?? [];
 
     foreach ($specs as $spec) {
@@ -126,7 +125,7 @@ function easysteam_build_info_tabs($payload) {
             continue;
         }
         $source_group = trim((string) ($spec['group'] ?? 'Характеристики'));
-        $tab_title = in_array($source_group, $general_groups, true) ? 'Общие характеристики' : $source_group;
+        $tab_title = easysteam_info_tab_title($source_group, $name);
         if (!isset($tabs[$tab_title])) {
             $tabs[$tab_title] = ['specs' => [], 'options' => []];
         }
@@ -137,7 +136,10 @@ function easysteam_build_info_tabs($payload) {
     }
 
     $preferred_order = [
-        'Общие характеристики',
+        'Обзор',
+        'Основные параметры',
+        'Материалы',
+        'Конструкция',
         'Вид топлива',
         'Габариты и вес',
     ];
@@ -154,6 +156,26 @@ function easysteam_build_info_tabs($payload) {
     }
 
     return $ordered;
+}
+
+function easysteam_info_tab_title($source_group, $name) {
+    if ($source_group === 'Основная информация') {
+        return 'Обзор';
+    }
+
+    if ($source_group === 'Основные характеристики') {
+        return 'Основные параметры';
+    }
+
+    if ($source_group === 'Общие характеристики') {
+        $name_lower = mb_strtolower($name);
+        if (strpos($name_lower, 'материал') !== false || strpos($name_lower, 'толщина') !== false) {
+            return 'Материалы';
+        }
+        return 'Конструкция';
+    }
+
+    return $source_group;
 }
 
 function easysteam_tab_info_specs($key, $tab) {
