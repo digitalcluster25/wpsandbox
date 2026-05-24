@@ -115,6 +115,23 @@ function hws_cartesian($groups, $index = 0, $current = []) {
     return $result;
 }
 
+function hws_default_combo($groups) {
+    $combo = [];
+    foreach ($groups as $group) {
+        $selected = $group['values'][0] ?? null;
+        foreach ($group['values'] as $value) {
+            if (!empty($value['is_default'])) {
+                $selected = $value;
+                break;
+            }
+        }
+        if ($selected) {
+            $combo[] = ['group' => $group, 'value' => $selected];
+        }
+    }
+    return [$combo];
+}
+
 function hws_update_product($product) {
     $base_sku = trim((string) ($product['source_sku'] ?? ''));
     echo "Importing {$base_sku} / catalog {$product['id']}\n";
@@ -190,8 +207,12 @@ function hws_update_product($product) {
     }
 
     $base_price = (float) ($product['base_price'] ?? 0);
-    $combos = hws_cartesian($product['option_groups']);
-    echo "Product {$base_sku}: " . count($combos) . " variation combinations\n";
+    $all_combos = hws_cartesian($product['option_groups']);
+    $max_variations = (int) (getenv('HWS_MAX_VARIATIONS') ?: 200);
+    $combos = count($all_combos) > $max_variations ? hws_default_combo($product['option_groups']) : $all_combos;
+    echo "Product {$base_sku}: " . count($all_combos) . " possible combinations, importing " . count($combos) . "\n";
+    update_post_meta($product_id, '_hws_possible_variation_count', count($all_combos));
+    update_post_meta($product_id, '_hws_imported_variation_count', count($combos));
     $variation_count = 0;
     foreach ($combos as $combo) {
         $variation = new WC_Product_Variation();

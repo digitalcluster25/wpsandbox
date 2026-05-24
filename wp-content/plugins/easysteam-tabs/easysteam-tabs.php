@@ -90,8 +90,22 @@ add_filter('woocommerce_product_tabs', function($tabs) {
         ];
     }
 
+    $specs = get_post_meta($pid, '_hws_specs_html', true);
+    if ($specs) {
+        $tabs['hws_specs'] = [
+            'title'    => __('Характеристики'),
+            'priority' => 12,
+            'callback' => 'easysteam_tab_specs',
+        ];
+    }
+
     return $tabs;
 });
+
+function easysteam_tab_specs() {
+    global $product;
+    echo '<div class="easysteam-tab-content hws-specs-tab">' . wp_kses_post(get_post_meta($product->get_id(), '_hws_specs_html', true)) . '</div>';
+}
 
 function easysteam_tab_cutaway() {
     global $product;
