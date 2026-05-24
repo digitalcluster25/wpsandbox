@@ -3,7 +3,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-$json_path = $argv[1] ?? '/tmp/easysteam_wp_import.json';
+$json_path = getenv('HWS_IMPORT_JSON') ?: ($argv[1] ?? '/tmp/easysteam_wp_import.json');
 $payload = json_decode(file_get_contents($json_path), true);
 if (!is_array($payload)) {
     fwrite(STDERR, "Import JSON is invalid\n");
