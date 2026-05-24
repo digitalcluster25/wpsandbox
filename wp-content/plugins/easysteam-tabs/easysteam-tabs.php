@@ -313,11 +313,11 @@ add_action('wp_footer', function() {
             display: inline-block;
             margin-left: 6px;
             font-size: 12px;
-            color: #6b8e23;
+            color: #111111;
             white-space: nowrap;
         }
         .hws-variation-chip.is-selected .hws-chip-price {
-            color: #557316;
+            color: #111111;
         }
         .variations_form.cart .reset_variations {
             display: inline-flex !important;
