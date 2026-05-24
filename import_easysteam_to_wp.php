@@ -117,6 +117,7 @@ function hws_cartesian($groups, $index = 0, $current = []) {
 
 function hws_update_product($product) {
     $base_sku = trim((string) ($product['source_sku'] ?? ''));
+    echo "Importing {$base_sku} / catalog {$product['id']}\n";
     if (!$base_sku) {
         return ['status' => 'skipped', 'reason' => 'missing sku'];
     }
@@ -150,7 +151,7 @@ function hws_update_product($product) {
     }
 
     $main_image = $product['main_image'] ?: ($product['raw_data']['detail']['main_image'] ?? null) ?: ($product['raw_data']['card']['image'] ?? null);
-    if ($main_image) {
+    if (getenv('HWS_IMPORT_IMAGES') && $main_image) {
         $image_id = hws_sideload_image($main_image, $wc_product->get_id(), $name);
         if ($image_id) {
             $wc_product->set_image_id($image_id);
@@ -190,6 +191,7 @@ function hws_update_product($product) {
 
     $base_price = (float) ($product['base_price'] ?? 0);
     $combos = hws_cartesian($product['option_groups']);
+    echo "Product {$base_sku}: " . count($combos) . " variation combinations\n";
     $variation_count = 0;
     foreach ($combos as $combo) {
         $variation = new WC_Product_Variation();
