@@ -105,7 +105,7 @@ add_filter('woocommerce_product_tabs', function($tabs) {
     }
 
     return $tabs;
-});
+}, 99);
 
 function easysteam_tab_specs() {
     global $product;
