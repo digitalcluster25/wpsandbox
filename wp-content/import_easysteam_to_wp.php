@@ -243,7 +243,7 @@ function hws_update_product($product) {
                 $suffixes[] = $value['sku_suffix'];
             }
             $variation_attributes[hws_attribute_key($group['name'])] = $value['name'];
-            if (getenv('HWS_IMPORT_VARIATION_IMAGES') && !$variation_image && !empty($value['image_url'])) {
+            if (getenv('HWS_IMPORT_VARIATION_IMAGES') && getenv('HWS_USE_OPTION_IMAGES_FOR_VARIATIONS') && !$variation_image && !empty($value['image_url'])) {
                 $variation_image = hws_sideload_image($value['image_url'], $product_id, $name . ' ' . $value['name']);
             }
         }
