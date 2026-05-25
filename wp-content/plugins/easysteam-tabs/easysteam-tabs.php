@@ -90,6 +90,10 @@ add_filter('woocommerce_product_tabs', function($tabs) {
         unset($tabs['additional_information']);
     }
 
+    if ($has_hws_payload && isset($tabs['description'])) {
+        $tabs['description']['callback'] = 'easysteam_tab_description_with_cta';
+    }
+
     $cutaway = get_field('cutaway', $pid);
     if ($cutaway) {
         $tabs['cutaway'] = [
@@ -231,6 +235,63 @@ function easysteam_tab_purpose() {
 function easysteam_tab_advantages() {
     global $product;
     echo '<div class="easysteam-tab-content">' . wp_kses_post(get_field('advantages', $product->get_id())) . '</div>';
+}
+
+function easysteam_tab_description_with_cta() {
+    global $product;
+
+    if (function_exists('woocommerce_product_description_tab')) {
+        woocommerce_product_description_tab();
+    } elseif ($product) {
+        echo '<div class="easysteam-tab-content">' . wp_kses_post(wpautop($product->get_description())) . '</div>';
+    }
+
+    if ($product) {
+        echo easysteam_consultation_cta($product);
+    }
+}
+
+function easysteam_consultation_cta($product) {
+    $product_name = $product->get_name();
+    $sku = $product->get_sku();
+    ob_start();
+    ?>
+    <section class="hws-consultation-cta" data-hws-product-name="<?php echo esc_attr($product_name); ?>" data-hws-product-sku="<?php echo esc_attr($sku); ?>">
+        <div class="hws-consultation-cta__content">
+            <p class="hws-consultation-cta__eyebrow">Подбор перед заказом</p>
+            <h3 class="hws-consultation-cta__title">Поможем проверить печь под вашу парную</h3>
+            <p class="hws-consultation-cta__text">Печь зависит от объема, дымохода, топлива, облицовки и монтажа. Отправьте выбранную комплектацию менеджеру — сверим мощность, сроки поставки и комплект для установки.</p>
+            <div class="hws-consultation-cta__selection">
+                <div>
+                    <span>Товар</span>
+                    <strong class="hws-cta-product-name"><?php echo esc_html($product_name); ?></strong>
+                </div>
+                <div>
+                    <span>Комплектация</span>
+                    <strong class="hws-cta-options">Выберите опции выше</strong>
+                </div>
+            </div>
+        </div>
+        <div class="hws-consultation-cta__actions">
+            <a class="hws-consultation-cta__button hws-consultation-cta__button--telegram" href="#" target="_blank" rel="noopener">
+                <?php echo easysteam_messenger_icon('telegram'); ?>
+                <span>Telegram</span>
+            </a>
+            <a class="hws-consultation-cta__button hws-consultation-cta__button--whatsapp" href="#" target="_blank" rel="noopener">
+                <?php echo easysteam_messenger_icon('whatsapp'); ?>
+                <span>WhatsApp</span>
+            </a>
+        </div>
+    </section>
+    <?php
+    return ob_get_clean();
+}
+
+function easysteam_messenger_icon($type) {
+    if ($type === 'telegram') {
+        return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21.7 3.4 18.5 20c-.2 1.1-.9 1.4-1.8.9l-5-3.7-2.4 2.3c-.3.3-.5.5-1 .5l.4-5.2 9.4-8.5c.4-.4-.1-.6-.6-.2L5.9 13.4.9 11.8c-1.1-.3-1.1-1.1.2-1.6L20.5 2.7c.9-.3 1.7.2 1.2.7Z"/></svg>';
+    }
+    return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2a9.8 9.8 0 0 0-8.5 14.8L2.2 22l5.3-1.4A9.8 9.8 0 1 0 12 2Zm0 17.8a7.8 7.8 0 0 1-4-1.1l-.3-.2-3.1.8.8-3-.2-.3A7.8 7.8 0 1 1 12 19.8Zm4.3-5.8c-.2-.1-1.4-.7-1.6-.8-.2-.1-.4-.1-.6.1-.2.2-.7.8-.8 1-.2.2-.3.2-.6.1a6.4 6.4 0 0 1-3.2-2.8c-.2-.3 0-.4.1-.6l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-.7-1.7c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.2.2-.9.9-.9 2.1s.9 2.4 1 2.6c.1.2 1.8 2.8 4.4 3.9.6.3 1.1.4 1.5.5.6.2 1.2.1 1.6.1.5-.1 1.4-.6 1.6-1.1.2-.6.2-1 .1-1.1-.1-.2-.3-.2-.5-.3Z"/></svg>';
 }
 
 add_filter('woocommerce_dropdown_variation_attribute_options_html', function($html, $args) {
@@ -378,15 +439,177 @@ add_action('wp_footer', function() {
             margin: 0 !important;
             padding: 0 !important;
         }
+        .hws-consultation-cta {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 28px;
+            align-items: center;
+            width: 100%;
+            margin: 38px 0 0;
+            padding: 44px 46px;
+            border-radius: 22px;
+            background: rgba(255, 255, 255, 0.64);
+            box-shadow: 0 18px 44px rgba(17, 24, 39, 0.08);
+        }
+        .hws-consultation-cta__eyebrow {
+            margin: 0 0 10px;
+            color: #4f4f4b;
+            font-size: 15px;
+            line-height: 1.35;
+            font-weight: 600;
+        }
+        .hws-consultation-cta__title {
+            max-width: 760px;
+            margin: 0;
+            color: #111111;
+            font-size: 36px;
+            line-height: 1.08;
+            font-weight: 700;
+            letter-spacing: 0;
+        }
+        .hws-consultation-cta__text {
+            max-width: 780px;
+            margin: 18px 0 0;
+            color: #4f4f4b;
+            font-size: 17px;
+            line-height: 1.55;
+        }
+        .hws-consultation-cta__selection {
+            display: grid;
+            grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+            gap: 12px;
+            max-width: 860px;
+            margin-top: 24px;
+        }
+        .hws-consultation-cta__selection > div {
+            padding: 14px 16px;
+            border: 1px solid rgba(17, 24, 39, 0.12);
+            border-radius: 14px;
+            background: rgba(245, 242, 234, 0.58);
+        }
+        .hws-consultation-cta__selection span {
+            display: block;
+            margin-bottom: 5px;
+            color: #77746e;
+            font-size: 12px;
+            line-height: 1.2;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0;
+        }
+        .hws-consultation-cta__selection strong {
+            display: block;
+            color: #111111;
+            font-size: 15px;
+            line-height: 1.4;
+            font-weight: 600;
+        }
+        .hws-consultation-cta__actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-width: 210px;
+        }
+        .hws-consultation-cta__button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            min-height: 58px;
+            padding: 16px 24px;
+            border-radius: 18px;
+            color: #ffffff !important;
+            background: #141414;
+            text-decoration: none !important;
+            font-size: 16px;
+            line-height: 1;
+            font-weight: 700;
+            transition: transform .15s ease, background .15s ease, box-shadow .15s ease;
+        }
+        .hws-consultation-cta__button:hover {
+            transform: translateY(-1px);
+            background: #000000;
+            box-shadow: 0 12px 26px rgba(17, 24, 39, 0.14);
+        }
+        .hws-consultation-cta__button svg {
+            width: 21px;
+            height: 21px;
+            fill: currentColor;
+            flex: 0 0 21px;
+        }
         @media (max-width: 640px) {
             .hws-variation-chip {
                 flex: 1 1 100%;
                 justify-content: center;
                 text-align: center;
             }
+            .hws-consultation-cta {
+                grid-template-columns: 1fr;
+                padding: 28px 22px;
+                border-radius: 18px;
+            }
+            .hws-consultation-cta__title {
+                font-size: 28px;
+            }
+            .hws-consultation-cta__selection {
+                grid-template-columns: 1fr;
+            }
+            .hws-consultation-cta__actions {
+                min-width: 0;
+            }
         }
     </style>
     <script>
+        function hwsSelectedOptionsText() {
+            var form = document.querySelector('.variations_form.cart');
+            if (!form) return '';
+
+            var options = [];
+            form.querySelectorAll('.hws-variation-select-wrap select').forEach(function(select) {
+                if (!select.value) return;
+
+                var row = select.closest('.variation');
+                var label = row ? row.querySelector('label') : null;
+                var labelText = label ? label.textContent.replace(':', '').trim() : (select.getAttribute('data-attribute_name') || select.name || '').replace(/^attribute_/, '');
+                options.push(labelText + ': ' + select.value);
+            });
+
+            return options.join('; ');
+        }
+
+        function hwsUpdateConsultationCta() {
+            var cta = document.querySelector('.hws-consultation-cta');
+            if (!cta) return;
+
+            var titleNode = document.querySelector('.product_title');
+            var productName = cta.getAttribute('data-hws-product-name') || (titleNode ? titleNode.textContent.trim() : '');
+            var productSku = cta.getAttribute('data-hws-product-sku') || '';
+            var optionsText = hwsSelectedOptionsText();
+            var optionsNode = cta.querySelector('.hws-cta-options');
+            if (optionsNode) {
+                optionsNode.textContent = optionsText || 'Опции пока не выбраны';
+            }
+
+            var message = 'Здравствуйте! Хочу подобрать печь: ' + productName;
+            if (productSku) {
+                message += ' (арт. ' + productSku + ')';
+            }
+            if (optionsText) {
+                message += '. Выбранная комплектация: ' + optionsText;
+            }
+            message += '. Подскажите, подойдет ли она для моей парной и что нужно для монтажа?';
+
+            var pageUrl = window.location.href.split('#')[0];
+            var telegram = cta.querySelector('.hws-consultation-cta__button--telegram');
+            var whatsapp = cta.querySelector('.hws-consultation-cta__button--whatsapp');
+            if (telegram) {
+                telegram.href = 'https://t.me/share/url?url=' + encodeURIComponent(pageUrl) + '&text=' + encodeURIComponent(message);
+            }
+            if (whatsapp) {
+                whatsapp.href = 'https://wa.me/?text=' + encodeURIComponent(message + ' ' + pageUrl);
+            }
+        }
+
         function hwsTriggerVariationChange(select) {
             select.dispatchEvent(new Event('change', { bubbles: true }));
 
@@ -437,6 +660,7 @@ add_action('wp_footer', function() {
                     window.jQuery(this).trigger('check_variations');
                 });
             }
+            hwsUpdateConsultationCta();
         }
 
         document.addEventListener('click', function(event) {
@@ -454,6 +678,7 @@ add_action('wp_footer', function() {
             wrap.querySelectorAll('.hws-variation-chip').forEach(function(chip) {
                 chip.classList.toggle('is-selected', chip.getAttribute('data-hws-value') === select.value);
             });
+            hwsUpdateConsultationCta();
         });
 
         document.addEventListener('click', function(event) {
@@ -461,10 +686,20 @@ add_action('wp_footer', function() {
             document.querySelectorAll('.hws-variation-chip').forEach(function(chip) {
                 chip.classList.remove('is-selected');
             });
+            setTimeout(hwsUpdateConsultationCta, 0);
         });
 
-        document.addEventListener('DOMContentLoaded', hwsInitVariationChips);
-        window.addEventListener('load', hwsInitVariationChips);
+        document.addEventListener('DOMContentLoaded', function() {
+            hwsInitVariationChips();
+            hwsUpdateConsultationCta();
+        });
+        window.addEventListener('load', function() {
+            hwsInitVariationChips();
+            hwsUpdateConsultationCta();
+        });
+        if (window.jQuery) {
+            window.jQuery(document).on('found_variation reset_data', '.variations_form', hwsUpdateConsultationCta);
+        }
     </script>
     <?php
 });
