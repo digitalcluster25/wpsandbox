@@ -18,6 +18,14 @@ function hws_clean_text($value) {
     return trim(wp_strip_all_tags((string) $value));
 }
 
+function hws_import_price($rub_price) {
+    $rate = (float) getenv('HWS_USD_RUB_RATE');
+    if ($rate > 0) {
+        return (string) (ceil(((float) $rub_price / $rate) / 10) * 10);
+    }
+    return (string) $rub_price;
+}
+
 function hws_attribute_key($name) {
     return sanitize_title($name);
 }
@@ -194,6 +202,11 @@ function hws_update_product($product) {
     update_post_meta($product_id, '_hws_catalog_product_id', $product['id']);
     update_post_meta($product_id, '_hws_specs_html', hws_specs_html($product['specs'] ?? []));
     update_post_meta($product_id, '_hws_source_payload', wp_json_encode($product, JSON_UNESCAPED_UNICODE));
+    if ((float) getenv('HWS_USD_RUB_RATE') > 0) {
+        update_post_meta($product_id, '_hws_usd_rub_rate', (float) getenv('HWS_USD_RUB_RATE'));
+        update_post_meta($product_id, '_hws_price_currency', 'USD');
+        update_option('woocommerce_currency', 'USD');
+    }
 
     $old_variations = get_children([
         'post_parent' => $product_id,
@@ -235,14 +248,19 @@ function hws_update_product($product) {
             }
         }
         $variation->set_sku('ES-' . $base_sku . '-' . implode('-', $suffixes));
-        $variation->set_regular_price((string) max(0, $price));
+        $source_price = (string) max(0, $price);
+        $variation->set_regular_price(hws_import_price($source_price));
         $variation->set_attributes($variation_attributes);
         $variation->set_manage_stock(false);
         $variation->set_stock_status('instock');
         if ($variation_image) {
             $variation->set_image_id($variation_image);
         }
-        $variation->save();
+        $variation_id = $variation->save();
+        update_post_meta($variation_id, '_hws_price_rub_source', $source_price);
+        if ((float) getenv('HWS_USD_RUB_RATE') > 0) {
+            update_post_meta($variation_id, '_hws_usd_rub_rate', (float) getenv('HWS_USD_RUB_RATE'));
+        }
         $variation_count++;
     }
 
