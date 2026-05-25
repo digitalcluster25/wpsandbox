@@ -29,6 +29,30 @@ add_action('woocommerce_before_calculate_totals', function($cart) {
     }
 }, 20);
 
+add_action('woocommerce_product_meta_end', function() {
+    global $product;
+    if (!$product) {
+        return;
+    }
+
+    $brands = [];
+    if (taxonomy_exists('product_brand')) {
+        $brands = wp_get_object_terms($product->get_id(), 'product_brand', ['fields' => 'names']);
+    }
+
+    if (is_wp_error($brands) || empty($brands)) {
+        $payload = json_decode((string) get_post_meta($product->get_id(), '_hws_source_payload', true), true);
+        $brand = $payload['brand'] ?? ($payload['raw_data']['brand'] ?? '');
+        $brands = $brand ? [$brand] : [];
+    }
+
+    if (!$brands) {
+        return;
+    }
+
+    echo '<span class="hws_brand_wrapper">Brand: <span class="hws_product_brand">' . esc_html(implode(', ', $brands)) . '</span></span>';
+}, 25);
+
 add_action('acf/init', function() {
     if (!function_exists('acf_add_local_field_group')) return;
 
@@ -338,6 +362,15 @@ add_action('wp_footer', function() {
     if (!is_product()) {
         return;
     }
+    global $product;
+    $brand_names = [];
+    if ($product && taxonomy_exists('product_brand')) {
+        $brand_names = wp_get_object_terms($product->get_id(), 'product_brand', ['fields' => 'names']);
+    }
+    if (is_wp_error($brand_names)) {
+        $brand_names = [];
+    }
+    $brand_label = $brand_names ? implode(', ', $brand_names) : '';
     ?>
     <style>
         .variations_form.cart .variations {
@@ -438,6 +471,15 @@ add_action('wp_footer', function() {
             border: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
+        }
+        .product_meta .hws_brand_wrapper:before {
+            content: " · ";
+        }
+        .product_meta .hws_brand_wrapper {
+            display: inline;
+        }
+        .product_meta .hws_product_brand {
+            font-weight: 400;
         }
         .hws-consultation-cta {
             display: grid;
@@ -560,6 +602,30 @@ add_action('wp_footer', function() {
         }
     </style>
     <script>
+        window.hwsProductBrand = <?php echo wp_json_encode($brand_label, JSON_UNESCAPED_UNICODE); ?>;
+        window.hwsParentSku = <?php echo wp_json_encode($product ? $product->get_sku() : '', JSON_UNESCAPED_UNICODE); ?>;
+
+        function hwsEnsureProductBrandMeta() {
+            var meta = document.querySelector('.product_meta');
+            var sku = meta ? meta.querySelector('.sku_wrapper') : null;
+            if (!meta || !sku) return;
+
+            if (window.hwsParentSku) {
+                var skuValue = sku.querySelector('.sku');
+                if (skuValue) {
+                    skuValue.textContent = window.hwsParentSku;
+                }
+            }
+
+            if (!window.hwsProductBrand || meta.querySelector('.hws_brand_wrapper')) return;
+
+            var brand = document.createElement('span');
+            brand.className = 'hws_brand_wrapper';
+            brand.innerHTML = 'Brand: <span class="hws_product_brand"></span>';
+            brand.querySelector('.hws_product_brand').textContent = window.hwsProductBrand;
+            sku.insertAdjacentElement('afterend', brand);
+        }
+
         function hwsSelectedOptionsText() {
             var form = document.querySelector('.variations_form.cart');
             if (!form) return '';
@@ -690,15 +756,20 @@ add_action('wp_footer', function() {
         });
 
         document.addEventListener('DOMContentLoaded', function() {
+            hwsEnsureProductBrandMeta();
             hwsInitVariationChips();
             hwsUpdateConsultationCta();
         });
         window.addEventListener('load', function() {
+            hwsEnsureProductBrandMeta();
             hwsInitVariationChips();
             hwsUpdateConsultationCta();
         });
         if (window.jQuery) {
-            window.jQuery(document).on('found_variation reset_data', '.variations_form', hwsUpdateConsultationCta);
+            window.jQuery(document).on('found_variation reset_data', '.variations_form', function() {
+                hwsEnsureProductBrandMeta();
+                hwsUpdateConsultationCta();
+            });
         }
     </script>
     <?php

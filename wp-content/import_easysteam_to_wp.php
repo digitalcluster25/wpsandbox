@@ -108,10 +108,6 @@ function hws_short_description($product) {
     if (!$lines && !empty($detail['volume_text'])) {
         $lines[] = '<li>' . esc_html($detail['volume_text']) . '</li>';
     }
-    $sku = $product['source_sku'] ?? '';
-    if ($sku) {
-        $lines[] = '<li><strong>Артикул:</strong> ' . esc_html($sku) . '</li>';
-    }
     return '<ul class="hws-product-highlights">' . implode('', $lines) . '</ul>';
 }
 
