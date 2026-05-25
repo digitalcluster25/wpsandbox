@@ -237,9 +237,10 @@ add_filter('woocommerce_dropdown_variation_attribute_options_html', function($ht
         }
 
         $delta = isset($value['delta_price']) ? (float) $value['delta_price'] : 0;
+        $display_delta = easysteam_display_delta_price($product->get_id(), $delta);
         $chip_label = esc_html($label);
-        if ($delta > 0) {
-            $chip_label .= ' <span class="hws-chip-price">+' . wp_kses_post(wc_price($delta)) . '</span>';
+        if ($display_delta > 0) {
+            $chip_label .= ' <span class="hws-chip-price">+' . wp_kses_post(wc_price($display_delta)) . '</span>';
         }
 
         $is_selected = $selected === $label || (!$selected && !empty($value['is_default']));
@@ -414,4 +415,18 @@ function easysteam_find_option_group($payload, $attribute) {
         }
     }
     return null;
+}
+
+function easysteam_display_delta_price($product_id, $rub_delta) {
+    if ($rub_delta <= 0) {
+        return 0;
+    }
+
+    $rate = (float) get_post_meta($product_id, '_hws_usd_rub_rate', true);
+    $currency = get_woocommerce_currency();
+    if ($currency === 'USD' && $rate > 0) {
+        return ceil(($rub_delta / $rate) / 10) * 10;
+    }
+
+    return $rub_delta;
 }
