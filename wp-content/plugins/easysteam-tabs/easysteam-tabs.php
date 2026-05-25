@@ -507,6 +507,17 @@ add_action('wp_footer', function() {
         .product_meta .hws_product_brand {
             font-weight: 400;
         }
+        body.single-product .breadcrumb-holder .breadcrumb-item:has(a[href*="/product-category/bath-sauna-stoves/"]:not([href*="/russian-bath-stoves/"])) {
+            display: none;
+        }
+        @media (min-width: 1200px) {
+            body.single-product .vc_row > .woo-product-image.vc_col-lg-8,
+            body.single-product .vc_row > .woo-product-details.vc_col-lg-4 {
+                width: 50%;
+                max-width: 50%;
+                flex-basis: 50%;
+            }
+        }
         .hws-consultation-cta {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
@@ -650,6 +661,17 @@ add_action('wp_footer', function() {
             brand.innerHTML = 'Бренд: <span class="hws_product_brand"></span>';
             brand.querySelector('.hws_product_brand').textContent = window.hwsProductBrand;
             sku.insertAdjacentElement('afterend', brand);
+        }
+
+        function hwsTrimProductBreadcrumbs() {
+            document.querySelectorAll('body.single-product .breadcrumb-holder .breadcrumb-item a[href*="/product-category/bath-sauna-stoves/"]').forEach(function(link) {
+                if (link.href.indexOf('/russian-bath-stoves/') !== -1) return;
+
+                var item = link.closest('.breadcrumb-item');
+                if (item) {
+                    item.remove();
+                }
+            });
         }
 
         function hwsTranslateTemplateText() {
@@ -882,12 +904,14 @@ add_action('wp_footer', function() {
         });
 
         document.addEventListener('DOMContentLoaded', function() {
+            hwsTrimProductBreadcrumbs();
             hwsTranslateTemplateText();
             hwsEnsureProductBrandMeta();
             hwsInitVariationChips();
             hwsUpdateConsultationCta();
         });
         window.addEventListener('load', function() {
+            hwsTrimProductBreadcrumbs();
             hwsTranslateTemplateText();
             hwsEnsureProductBrandMeta();
             hwsInitVariationChips();
