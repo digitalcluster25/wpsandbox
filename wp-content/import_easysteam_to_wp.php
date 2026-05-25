@@ -30,6 +30,24 @@ function hws_attribute_key($name) {
     return sanitize_title($name);
 }
 
+function hws_ensure_product_brand_term($brand_name) {
+    if (!taxonomy_exists('product_brand')) {
+        return 0;
+    }
+
+    $term = get_term_by('name', $brand_name, 'product_brand');
+    if ($term) {
+        return (int) $term->term_id;
+    }
+
+    $created = wp_insert_term($brand_name, 'product_brand', ['slug' => sanitize_title($brand_name)]);
+    if (is_wp_error($created)) {
+        return 0;
+    }
+
+    return (int) $created['term_id'];
+}
+
 function hws_find_attachment_by_source($url) {
     if (!$url) {
         return 0;
@@ -181,7 +199,6 @@ function hws_update_product($product) {
     if ($category_id) {
         $wc_product->set_category_ids([$category_id]);
     }
-
     $main_image = $product['main_image'] ?: ($product['raw_data']['detail']['main_image'] ?? null) ?: ($product['raw_data']['card']['image'] ?? null);
     if (getenv('HWS_IMPORT_IMAGES') && $main_image) {
         $image_id = hws_sideload_image($main_image, $wc_product->get_id(), $name);
@@ -205,6 +222,10 @@ function hws_update_product($product) {
     }
     $wc_product->set_attributes($attributes);
     $product_id = $wc_product->save();
+    $brand_id = hws_ensure_product_brand_term($product['brand'] ?? ($product['raw_data']['brand'] ?? 'EasySteam'));
+    if ($brand_id) {
+        wp_set_object_terms($product_id, [$brand_id], 'product_brand', false);
+    }
 
     update_post_meta($product_id, '_hws_catalog_product_id', $product['id']);
     update_post_meta($product_id, '_hws_specs_html', hws_specs_html($product['specs'] ?? []));
