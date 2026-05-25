@@ -24,6 +24,13 @@ function hws_ru_template_string($translated, $text) {
         'Cart review' => 'Корзина',
         'Purchase' => 'Оформить заказ',
         'Skip to content' => 'Перейти к содержимому',
+        'Filters' => 'Фильтры',
+        'Filter by price' => 'Цена',
+        'Filter by stock status' => 'Наличие',
+        'Filter by attribute' => 'Параметры',
+        'Filter by rating' => 'Рейтинг',
+        'Active filters' => 'Выбранные фильтры',
+        'Close' => 'Закрыть',
     ];
 
     return $map[$text] ?? $translated;
@@ -344,6 +351,25 @@ function easysteam_messenger_icon($type) {
     return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2a9.8 9.8 0 0 0-8.5 14.8L2.2 22l5.3-1.4A9.8 9.8 0 1 0 12 2Zm0 17.8a7.8 7.8 0 0 1-4-1.1l-.3-.2-3.1.8.8-3-.2-.3A7.8 7.8 0 1 1 12 19.8Zm4.3-5.8c-.2-.1-1.4-.7-1.6-.8-.2-.1-.4-.1-.6.1-.2.2-.7.8-.8 1-.2.2-.3.2-.6.1a6.4 6.4 0 0 1-3.2-2.8c-.2-.3 0-.4.1-.6l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-.7-1.7c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.2.2-.9.9-.9 2.1s.9 2.4 1 2.6c.1.2 1.8 2.8 4.4 3.9.6.3 1.1.4 1.5.5.6.2 1.2.1 1.6.1.5-.1 1.4-.6 1.6-1.1.2-.6.2-1 .1-1.1-.1-.2-.3-.2-.5-.3Z"/></svg>';
 }
 
+function easysteam_short_option_label($label) {
+    $label = trim((string) $label);
+    $map = [
+        'Боковой вход в каменку' => 'Боковой вход',
+        'Варианты кожуха' => 'Кожух',
+        'Вид топлива' => 'Топливо',
+        'Марка стали' => 'Сталь',
+        'С тыла' => 'Сзади',
+        'Жадеит (Цена по запросу)' => 'Жадеит по запросу',
+        'Дрова Стандартная комплектация' => 'Дрова',
+        'Подготовка под ГГУ' => 'Под газовую горелку',
+        'Газ Комплектация с САБК-40' => 'Газ САБК-40',
+        'Газ, дрова Комплектация с ГГУ-40' => 'Газ + дрова ГГУ-40',
+        'Защ. экраны' => 'Защитные экраны',
+    ];
+
+    return $map[$label] ?? $label;
+}
+
 add_filter('woocommerce_dropdown_variation_attribute_options_html', function($html, $args) {
     $product = $args['product'] ?? null;
     if (!$product || !($product instanceof WC_Product)) {
@@ -362,16 +388,17 @@ add_filter('woocommerce_dropdown_variation_attribute_options_html', function($ht
     }
 
     $selected = (string) ($args['selected'] ?? '');
-    $chips = '<div class="hws-variation-chips" data-hws-attribute="' . esc_attr($attribute) . '">';
+    $chips = '<div class="hws-variation-chips" data-hws-attribute="' . esc_attr(easysteam_short_option_label($attribute)) . '">';
     foreach (($group['values'] ?? []) as $value) {
         $label = trim((string) ($value['name'] ?? ''));
         if (!$label) {
             continue;
         }
+        $short_label = easysteam_short_option_label($label);
 
         $delta = isset($value['delta_price']) ? (float) $value['delta_price'] : 0;
         $display_delta = easysteam_display_delta_price($product->get_id(), $delta);
-        $chip_label = esc_html($label);
+        $chip_label = esc_html($short_label);
         if ($display_delta > 0) {
             $chip_label .= ' <span class="hws-chip-price">+' . wp_kses_post(wc_price($display_delta)) . '</span>';
         }
@@ -674,6 +701,33 @@ add_action('wp_footer', function() {
             });
         }
 
+        function hwsShortOptionLabel(value) {
+            var map = {
+                'Боковой вход в каменку': 'Боковой вход',
+                'Варианты кожуха': 'Кожух',
+                'Вид топлива': 'Топливо',
+                'Марка стали': 'Сталь',
+                'С тыла': 'Сзади',
+                'Жадеит (Цена по запросу)': 'Жадеит по запросу',
+                'Дрова Стандартная комплектация': 'Дрова',
+                'Подготовка под ГГУ': 'Под газовую горелку',
+                'Газ Комплектация с САБК-40': 'Газ САБК-40',
+                'Газ, дрова Комплектация с ГГУ-40': 'Газ + дрова ГГУ-40',
+                'Защ. экраны': 'Защитные экраны'
+            };
+            return map[value] || value;
+        }
+
+        function hwsShortenVariationLabels() {
+            document.querySelectorAll('.variations_form.cart .variation label').forEach(function(label) {
+                var raw = label.textContent.replace(':', '').trim();
+                var shortLabel = hwsShortOptionLabel(raw);
+                if (shortLabel !== raw) {
+                    label.textContent = shortLabel + ':';
+                }
+            });
+        }
+
         function hwsTranslateTemplateText() {
             var translations = {
                 'In stock': 'В наличии',
@@ -686,6 +740,13 @@ add_action('wp_footer', function() {
                 'Related products': 'Похожие товары',
                 'Scroll to top': 'Наверх',
                 'No products in the cart.': 'В корзине нет товаров.',
+                'Filters': 'Фильтры',
+                'Filter by price': 'Цена',
+                'Filter by stock status': 'Наличие',
+                'Filter by attribute': 'Параметры',
+                'Filter by rating': 'Рейтинг',
+                'Active filters': 'Выбранные фильтры',
+                'Close': 'Закрыть',
                 'Follow Us': 'Мы в соцсетях',
                 'Follow us': 'Мы в соцсетях',
                 'About us': 'О нас',
@@ -785,7 +846,7 @@ add_action('wp_footer', function() {
                 var row = select.closest('.variation');
                 var label = row ? row.querySelector('label') : null;
                 var labelText = label ? label.textContent.replace(':', '').trim() : (select.getAttribute('data-attribute_name') || select.name || '').replace(/^attribute_/, '');
-                options.push(labelText + ': ' + select.value);
+                options.push(hwsShortOptionLabel(labelText) + ': ' + hwsShortOptionLabel(select.value));
             });
 
             return options.join('; ');
@@ -906,6 +967,7 @@ add_action('wp_footer', function() {
         document.addEventListener('DOMContentLoaded', function() {
             hwsTrimProductBreadcrumbs();
             hwsTranslateTemplateText();
+            hwsShortenVariationLabels();
             hwsEnsureProductBrandMeta();
             hwsInitVariationChips();
             hwsUpdateConsultationCta();
@@ -913,6 +975,7 @@ add_action('wp_footer', function() {
         window.addEventListener('load', function() {
             hwsTrimProductBreadcrumbs();
             hwsTranslateTemplateText();
+            hwsShortenVariationLabels();
             hwsEnsureProductBrandMeta();
             hwsInitVariationChips();
             hwsUpdateConsultationCta();
