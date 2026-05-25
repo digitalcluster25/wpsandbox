@@ -7,6 +7,32 @@
 
 if (!defined('ABSPATH')) exit;
 
+function hws_ru_template_string($translated, $text) {
+    $map = [
+        'In stock' => 'В наличии',
+        'Out of stock' => 'Нет в наличии',
+        'SKU' => 'Артикул',
+        'SKU:' => 'Артикул:',
+        'Brand' => 'Бренд',
+        'Brand:' => 'Бренд:',
+        'Clear' => 'Сбросить',
+        'Clear options' => 'Сбросить опции',
+        'Product Added' => 'Товар добавлен',
+        'Related products' => 'Похожие товары',
+        'Scroll to top' => 'Наверх',
+        'No products in the cart.' => 'В корзине нет товаров.',
+        'Cart review' => 'Корзина',
+        'Purchase' => 'Оформить заказ',
+        'Skip to content' => 'Перейти к содержимому',
+    ];
+
+    return $map[$text] ?? $translated;
+}
+add_filter('gettext', 'hws_ru_template_string', 20, 2);
+add_filter('gettext_with_context', function($translated, $text) {
+    return hws_ru_template_string($translated, $text);
+}, 20, 2);
+
 add_action('woocommerce_before_calculate_totals', function($cart) {
     if (is_admin() && !defined('DOING_AJAX')) {
         return;
@@ -50,7 +76,7 @@ add_action('woocommerce_product_meta_end', function() {
         return;
     }
 
-    echo '<span class="hws_brand_wrapper">Brand: <span class="hws_product_brand">' . esc_html(implode(', ', $brands)) . '</span></span>';
+    echo '<span class="hws_brand_wrapper">Бренд: <span class="hws_product_brand">' . esc_html(implode(', ', $brands)) . '</span></span>';
 }, 25);
 
 add_action('acf/init', function() {
@@ -621,9 +647,109 @@ add_action('wp_footer', function() {
 
             var brand = document.createElement('span');
             brand.className = 'hws_brand_wrapper';
-            brand.innerHTML = 'Brand: <span class="hws_product_brand"></span>';
+            brand.innerHTML = 'Бренд: <span class="hws_product_brand"></span>';
             brand.querySelector('.hws_product_brand').textContent = window.hwsProductBrand;
             sku.insertAdjacentElement('afterend', brand);
+        }
+
+        function hwsTranslateTemplateText() {
+            var translations = {
+                'In stock': 'В наличии',
+                'Out of stock': 'Нет в наличии',
+                'SKU:': 'Артикул:',
+                'Brand:': 'Бренд:',
+                'Clear': 'Сбросить',
+                'Clear options': 'Сбросить опции',
+                'Product Added': 'Товар добавлен',
+                'Related products': 'Похожие товары',
+                'Scroll to top': 'Наверх',
+                'No products in the cart.': 'В корзине нет товаров.',
+                'Follow Us': 'Мы в соцсетях',
+                'Follow us': 'Мы в соцсетях',
+                'About us': 'О нас',
+                'Company': 'Компания',
+                'Contact Us': 'Контакты',
+                'Customer service': 'Сервис',
+                'Assembly manuals': 'Инструкции по сборке',
+                'Care and maintenance': 'Уход и обслуживание',
+                'Fabric overview': 'Обзор материалов',
+                'Get Help': 'Помощь',
+                'Get In Touch': 'Связаться',
+                'Help center': 'Центр помощи',
+                'Live chat': 'Онлайн-чат',
+                'Product fact sheets': 'Характеристики товаров',
+                'Products': 'Товары',
+                'Responsibility': 'Ответственность',
+                'Security': 'Безопасность',
+                'Accessories': 'Аксессуары',
+                'Lighting': 'Освещение',
+                'Seating': 'Мебель для сидения',
+                'Shelving & storage': 'Полки и хранение',
+                'Shipping and delivery': 'Доставка',
+                'Returns & warranty': 'Возврат и гарантия',
+                'Order cancellation': 'Отмена заказа',
+                'Privacy & Cookie Policy': 'Политика конфиденциальности',
+                'Terms of Service': 'Условия сервиса',
+                'Accessibility statement': 'Доступность сайта',
+                'Shopping assistance': 'Помощь с покупкой',
+                'Secure and easy payments': 'Безопасная оплата',
+                'Styling sessions': 'Консультации по подбору',
+                'Gift card balance': 'Баланс подарочной карты',
+                'Weekly hours': 'Часы работы',
+                'Work Inquiries': 'Рабочие запросы',
+                'Sign up': 'Подписаться',
+                'Welcome,': 'Добро пожаловать,',
+                'here and take 10% off': 'и получите скидку 10%',
+                'EU delivery within 2-5 days*': 'Доставка по региону по согласованию',
+                'Free shipping on EU orders, some exclusions apply*': 'Доставка и монтаж рассчитываются индивидуально',
+                'Open. Closes at 11:55\u202fPM ET.': 'Открыто',
+                'Open. Closes at 11:59\u202fPM ET.': 'Открыто'
+            };
+
+            document.querySelectorAll('[aria-label], [title], [data-product-added-text]').forEach(function(node) {
+                ['aria-label', 'title', 'data-product-added-text'].forEach(function(attr) {
+                    var value = node.getAttribute(attr);
+                    if (value && translations[value]) {
+                        node.setAttribute(attr, translations[value]);
+                    }
+                });
+            });
+
+            var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+                acceptNode: function(node) {
+                    if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                    var parent = node.parentElement;
+                    if (!parent || ['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA'].indexOf(parent.tagName) !== -1) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            });
+
+            var nodes = [];
+            while (walker.nextNode()) {
+                nodes.push(walker.currentNode);
+            }
+
+            nodes.forEach(function(node) {
+                var raw = node.nodeValue;
+                var trimmed = raw.trim();
+                if (translations[trimmed]) {
+                    node.nodeValue = raw.replace(trimmed, translations[trimmed]);
+                    return;
+                }
+
+                var replaced = raw;
+                Object.keys(translations).forEach(function(source) {
+                    if (replaced.indexOf(source) !== -1) {
+                        replaced = replaced.split(source).join(translations[source]);
+                    }
+                });
+
+                if (replaced !== raw) {
+                    node.nodeValue = replaced;
+                }
+            });
         }
 
         function hwsSelectedOptionsText() {
@@ -756,11 +882,13 @@ add_action('wp_footer', function() {
         });
 
         document.addEventListener('DOMContentLoaded', function() {
+            hwsTranslateTemplateText();
             hwsEnsureProductBrandMeta();
             hwsInitVariationChips();
             hwsUpdateConsultationCta();
         });
         window.addEventListener('load', function() {
+            hwsTranslateTemplateText();
             hwsEnsureProductBrandMeta();
             hwsInitVariationChips();
             hwsUpdateConsultationCta();
