@@ -387,22 +387,63 @@ add_action('wp_footer', function() {
         }
     </style>
     <script>
-        document.addEventListener('click', function(event) {
-            var chip = event.target.closest('.hws-variation-chip');
-            if (!chip) return;
+        function hwsTriggerVariationChange(select) {
+            select.dispatchEvent(new Event('change', { bubbles: true }));
 
+            if (window.jQuery) {
+                var $select = window.jQuery(select);
+                var $form = $select.closest('.variations_form');
+                $select.trigger('change');
+                if ($form.length) {
+                    $form.trigger('check_variations');
+                }
+            }
+        }
+
+        function hwsSetSelectFromChip(chip) {
             var wrap = chip.closest('.hws-variation-select-wrap');
             if (!wrap) return;
 
             var select = wrap.querySelector('select');
             if (!select) return;
 
-            select.value = chip.getAttribute('data-hws-value') || '';
-            select.dispatchEvent(new Event('change', { bubbles: true }));
+            var value = chip.getAttribute('data-hws-value') || '';
+            var option = Array.prototype.find.call(select.options, function(item) {
+                return item.value === value;
+            });
+            if (!option) return;
+
+            select.value = value;
+            hwsTriggerVariationChange(select);
 
             wrap.querySelectorAll('.hws-variation-chip').forEach(function(item) {
                 item.classList.toggle('is-selected', item === chip);
             });
+        }
+
+        function hwsInitVariationChips() {
+            document.querySelectorAll('.hws-variation-select-wrap').forEach(function(wrap) {
+                var select = wrap.querySelector('select');
+                var selectedChip = wrap.querySelector('.hws-variation-chip.is-selected');
+                if (!select || !selectedChip) return;
+
+                if (!select.value) {
+                    hwsSetSelectFromChip(selectedChip);
+                }
+            });
+
+            if (window.jQuery) {
+                window.jQuery('.variations_form').each(function() {
+                    window.jQuery(this).trigger('check_variations');
+                });
+            }
+        }
+
+        document.addEventListener('click', function(event) {
+            var chip = event.target.closest('.hws-variation-chip');
+            if (!chip) return;
+
+            hwsSetSelectFromChip(chip);
         });
 
         document.addEventListener('change', function(event) {
@@ -421,6 +462,9 @@ add_action('wp_footer', function() {
                 chip.classList.remove('is-selected');
             });
         });
+
+        document.addEventListener('DOMContentLoaded', hwsInitVariationChips);
+        window.addEventListener('load', hwsInitVariationChips);
     </script>
     <?php
 });
