@@ -64,11 +64,18 @@ function hws_sideload_image($url, $post_id, $desc = '') {
 
 function hws_product_description($product) {
     $detail = $product['raw_data']['detail'] ?? [];
+    if (!empty($product['description'])) {
+        return wpautop(esc_html($product['description']));
+    }
+
+    if (!empty($detail['description'])) {
+        return wpautop(esc_html($detail['description']));
+    }
+
     $parts = [];
     if (!empty($detail['banner_text'])) {
         $parts[] = '<p>' . esc_html($detail['banner_text']) . '</p>';
     }
-    $parts[] = '<p>Подбор мощности, комплектации и монтаж обсуждаются с менеджером перед оплатой. Цена на сайте рассчитана по базовой комплектации и выбранным опциям.</p>';
     return implode("\n", $parts);
 }
 
