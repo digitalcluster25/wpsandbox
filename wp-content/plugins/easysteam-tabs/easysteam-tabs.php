@@ -7,6 +7,28 @@
 
 if (!defined('ABSPATH')) exit;
 
+add_action('woocommerce_before_calculate_totals', function($cart) {
+    if (is_admin() && !defined('DOING_AJAX')) {
+        return;
+    }
+
+    if (!$cart || !method_exists($cart, 'get_cart')) {
+        return;
+    }
+
+    foreach ($cart->get_cart() as $cart_item) {
+        $product = $cart_item['data'] ?? null;
+        if (!$product || !($product instanceof WC_Product)) {
+            continue;
+        }
+
+        $current_price = $product->get_regular_price();
+        if ($current_price !== '') {
+            $product->set_price($current_price);
+        }
+    }
+}, 20);
+
 add_action('acf/init', function() {
     if (!function_exists('acf_add_local_field_group')) return;
 
