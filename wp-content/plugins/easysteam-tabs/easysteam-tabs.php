@@ -134,19 +134,18 @@ add_action('wp_head', function() {
         }
         body.home .elementor-widget-ohio_simple_products .product-item-thumbnail {
             height: 330px;
+            overflow: hidden;
+        }
+        body.home .elementor-widget-ohio_simple_products .product-item-thumbnail > div[data-cursor-class],
+        body.home .elementor-widget-ohio_simple_products .product-item-thumbnail .image-holder {
+            width: 100%;
+            height: 330px;
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
         }
-        body.home .elementor-widget-ohio_simple_products .image-holder {
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
-        body.home .elementor-widget-ohio_simple_products .image-holder img {
+        body.home .elementor-widget-ohio_simple_products .product-item-thumbnail .image-holder img {
             width: 100%;
             height: 100%;
             object-fit: contain;
@@ -245,8 +244,9 @@ add_action('wp_head', function() {
             body.home .elementor-widget-ohio_simple_products .product-item-thumbnail {
                 height: 260px;
             }
-            body.home .elementor-widget-ohio_simple_products .image-holder {
-                height: 100%;
+            body.home .elementor-widget-ohio_simple_products .product-item-thumbnail > div[data-cursor-class],
+            body.home .elementor-widget-ohio_simple_products .product-item-thumbnail .image-holder {
+                height: 260px;
             }
             body.home .elementor-element-a0d93dd .elementor-widget-ohio_banner,
             body.home .elementor-element-a0d93dd .elementor-widget-container,
