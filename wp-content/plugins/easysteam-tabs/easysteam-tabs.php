@@ -127,19 +127,19 @@ add_action('wp_head', function() {
         }
         body.home .elementor-widget-ohio_simple_products .product-item {
             height: 100%;
-            min-height: 560px;
+            min-height: 520px;
             display: flex;
             flex-direction: column;
             background: rgba(255, 255, 255, 0.28);
         }
         body.home .elementor-widget-ohio_simple_products .product-item-thumbnail {
-            height: 330px;
+            height: 290px;
             overflow: hidden;
         }
         body.home .elementor-widget-ohio_simple_products .product-item-thumbnail > div[data-cursor-class],
         body.home .elementor-widget-ohio_simple_products .product-item-thumbnail .image-holder {
             width: 100%;
-            height: 330px;
+            height: 290px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -160,12 +160,12 @@ add_action('wp_head', function() {
         }
         body.home .elementor-widget-ohio_simple_products .woo-product-name {
             display: -webkit-box !important;
-            min-height: 2.35em;
-            max-height: 2.35em;
+            min-height: 0;
+            max-height: 3.3em;
             overflow: hidden;
-            -webkit-line-clamp: 2;
+            -webkit-line-clamp: 3;
             -webkit-box-orient: vertical;
-            line-height: 1.08;
+            line-height: 1.1;
         }
         body.home .elementor-widget-ohio_simple_products .woo-category,
         body.home .elementor-widget-ohio_simple_products .woo-price {
@@ -187,9 +187,9 @@ add_action('wp_head', function() {
         body.home .elementor-element-a0d93dd .ohio-banner-sc > a,
         body.home .elementor-element-a0d93dd .ohio-banner-sc .image-holder {
             width: 100%;
-            height: 560px;
-            min-height: 560px;
-            max-height: 560px;
+            height: 520px;
+            min-height: 520px;
+            max-height: 520px;
         }
         body.home .elementor-element-a0d93dd .ohio-banner-sc .image-holder {
             position: relative;
@@ -209,8 +209,8 @@ add_action('wp_head', function() {
             flex-direction: column;
             justify-content: space-between;
             width: 100%;
-            height: 560px;
-            min-height: 560px;
+            height: 520px;
+            min-height: 520px;
             padding: 44px 42px 38px;
         }
         body.home .elementor-element-a0d93dd .ohio-banner-sc .heading {
