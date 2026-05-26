@@ -18,8 +18,10 @@ function hws_home_walk(&$elements, $callback) {
 }
 
 $featured_products = ['233015', '248457', '248466'];
+$picked_products = ['248503', '248501'];
+$bath_products = ['234056', '248559', '248547'];
 
-hws_home_walk($data, function (&$element) use ($featured_products) {
+hws_home_walk($data, function (&$element) use ($featured_products, $picked_products, $bath_products) {
     $id = $element['id'] ?? '';
     if (empty($element['settings']) || !is_array($element['settings'])) {
         return;
@@ -32,6 +34,18 @@ hws_home_walk($data, function (&$element) use ($featured_products) {
     if ($id === '1b32053') {
         $element['settings']['columns'] = 3;
         $element['settings']['products'] = $featured_products;
+        $element['settings']['order_by'] = 'post__in';
+    }
+
+    if ($id === '177558b') {
+        $element['settings']['columns'] = 2;
+        $element['settings']['products'] = $picked_products;
+        $element['settings']['order_by'] = 'post__in';
+    }
+
+    if ($id === '4063e47') {
+        $element['settings']['columns'] = 3;
+        $element['settings']['products'] = $bath_products;
         $element['settings']['order_by'] = 'post__in';
     }
 
