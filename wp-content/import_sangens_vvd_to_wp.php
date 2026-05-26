@@ -221,6 +221,46 @@ function hws_import_product($item) {
     return $product_id;
 }
 
+function hws_import_is_non_stove_item($item) {
+    $text = mb_strtolower(($item['name'] ?? '') . ' ' . ($item['source_url'] ?? ''));
+    $skip_needles = [
+        'пульт',
+        'pulty',
+        'труба-каменка',
+        'dvertsy-topochnogo',
+    ];
+    foreach ($skip_needles as $needle) {
+        if (str_contains($text, $needle)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function hws_import_dedupe_items($items) {
+    $deduped = [];
+    foreach ($items as $item) {
+        if (hws_import_is_non_stove_item($item)) {
+            continue;
+        }
+        $key = mb_strtolower(($item['brand'] ?? '') . '|' . ($item['name'] ?? '') . '|' . ($item['price_rub'] ?? ''));
+        if (!isset($deduped[$key])) {
+            $deduped[$key] = $item;
+            continue;
+        }
+
+        $current = $deduped[$key];
+        $current_url = $current['source_url'] ?? '';
+        $next_url = $item['source_url'] ?? '';
+        $current_is_listing = preg_match('~/(parogeneratory|parotermalnye-pechi|pechi-parizhar)/$~', $current_url);
+        $next_is_listing = preg_match('~/(parogeneratory|parotermalnye-pechi|pechi-parizhar)/$~', $next_url);
+        if ($current_is_listing && !$next_is_listing) {
+            $deduped[$key] = $item;
+        }
+    }
+    return array_values($deduped);
+}
+
 function hws_import_sangens_urls() {
     $urls = [];
     foreach ([
@@ -382,6 +422,7 @@ if (!$brand_filter || $brand_filter === 'vvd') {
         $items[] = hws_import_parse_vvd($url);
     }
 }
+$items = hws_import_dedupe_items($items);
 
 $results = [];
 foreach ($items as $item) {
@@ -409,4 +450,3 @@ echo wp_json_encode([
     'found' => count($items),
     'results' => $results,
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . PHP_EOL;
-
