@@ -176,6 +176,33 @@ function hws_import_specs_html($specs) {
     return '<table class="shop_attributes hws-specs"><tbody>' . implode('', $rows) . '</tbody></table>';
 }
 
+function hws_import_best_sangens_image($html, $url) {
+    $candidates = [];
+    preg_match_all('~(?:data-splide-lazy|data-lazy-src|src|content)=["\']([^"\']+\.(?:png|jpe?g|webp))(?:\?[^"\']*)?["\']~iu', $html, $matches);
+    foreach ($matches[1] as $candidate) {
+        $image_url = hws_import_abs_url($url, $candidate);
+        if (!$image_url || !str_contains($image_url, 'sangens.com/wp-content/uploads/')) {
+            continue;
+        }
+        $lower = mb_strtolower($image_url);
+        if (str_contains($lower, '-150x150') || str_contains($lower, 'favicon') || str_contains($lower, 'cropped-')) {
+            continue;
+        }
+        $priority = 10;
+        if (str_contains($lower, 'prod-image') || preg_match('~/uploads/\d{4}/\d{2}/[^/]+_[1234]\.(?:png|webp|jpg|jpeg)$~i', $image_url)) {
+            $priority = 1;
+        } elseif (str_contains($lower, '1200h850')) {
+            $priority = 5;
+        }
+        $candidates[$image_url] = min($candidates[$image_url] ?? 99, $priority);
+    }
+    if (!$candidates) {
+        return '';
+    }
+    uasort($candidates, fn($a, $b) => $a <=> $b);
+    return array_key_first($candidates);
+}
+
 function hws_import_product($item) {
     $sku = $item['sku'];
     $product_id = wc_get_product_id_by_sku($sku);
@@ -297,7 +324,10 @@ function hws_import_parse_sangens($url) {
         $description = hws_import_first_match('~<meta property="og:description" content="([^"]+)"~isu', $html);
     }
 
-    $image = hws_import_first_match('~<meta property="og:image" content="([^"]+)"~isu', $html);
+    $image = hws_import_best_sangens_image($html, $url);
+    if (!$image) {
+        $image = hws_import_first_match('~<meta property="og:image" content="([^"]+)"~isu', $html);
+    }
     if (!$image) {
         $image = hws_import_first_match('~data-splide-lazy=["\']([^"\']+)["\']~isu', $html);
     }
