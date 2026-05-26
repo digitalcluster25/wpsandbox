@@ -127,13 +127,20 @@ add_action('wp_head', function() {
         }
         body.home .elementor-widget-ohio_simple_products .product-item {
             height: 100%;
-            min-height: 470px;
+            min-height: 560px;
             display: flex;
             flex-direction: column;
             background: rgba(255, 255, 255, 0.28);
         }
+        body.home .elementor-widget-ohio_simple_products .product-item-thumbnail {
+            height: 330px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
         body.home .elementor-widget-ohio_simple_products .image-holder {
-            height: 300px;
+            height: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -150,19 +157,73 @@ add_action('wp_head', function() {
             flex: 1;
             flex-direction: column;
             justify-content: flex-end;
+            gap: 8px;
         }
         body.home .elementor-widget-ohio_simple_products .woo-product-name {
-            display: -webkit-box;
-            min-height: 2.8em;
+            display: -webkit-box !important;
+            min-height: 2.35em;
+            max-height: 2.35em;
             overflow: hidden;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
+            line-height: 1.08;
+        }
+        body.home .elementor-widget-ohio_simple_products .woo-category,
+        body.home .elementor-widget-ohio_simple_products .woo-price {
+            position: relative;
+            z-index: 1;
         }
         body.home .elementor-widget-ohio_banner .banner {
             min-height: 100%;
         }
         body.home .elementor-widget-ohio_banner .banner .heading .title {
             letter-spacing: 0;
+        }
+        body.home .elementor-element-a0d93dd {
+            display: block;
+        }
+        body.home .elementor-element-a0d93dd .elementor-widget-ohio_banner,
+        body.home .elementor-element-a0d93dd .elementor-widget-container,
+        body.home .elementor-element-a0d93dd .ohio-banner-sc,
+        body.home .elementor-element-a0d93dd .ohio-banner-sc > a,
+        body.home .elementor-element-a0d93dd .ohio-banner-sc .image-holder {
+            width: 100%;
+            height: 560px;
+            min-height: 560px;
+            max-height: 560px;
+        }
+        body.home .elementor-element-a0d93dd .ohio-banner-sc .image-holder {
+            position: relative;
+            display: flex;
+            background: #dfe5a5;
+        }
+        body.home .elementor-element-a0d93dd .ohio-banner-sc .image-holder > img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+        }
+        body.home .elementor-element-a0d93dd .ohio-banner-sc .overlay-details {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            width: 100%;
+            height: 560px;
+            min-height: 560px;
+            padding: 44px 42px 38px;
+        }
+        body.home .elementor-element-a0d93dd .ohio-banner-sc .heading {
+            display: flex;
+            flex-direction: column;
+        }
+        body.home .elementor-element-a0d93dd .ohio-banner-sc .heading .title {
+            order: 1;
+        }
+        body.home .elementor-element-a0d93dd .ohio-banner-sc .heading .subtitle {
+            order: 2;
+            margin-top: 18px;
         }
         @media (max-width: 768px) {
             .hws-service-page .hws-service-lead {
@@ -181,8 +242,24 @@ add_action('wp_head', function() {
             body.home .elementor-widget-ohio_simple_products .product-item {
                 min-height: 430px;
             }
-            body.home .elementor-widget-ohio_simple_products .image-holder {
+            body.home .elementor-widget-ohio_simple_products .product-item-thumbnail {
                 height: 260px;
+            }
+            body.home .elementor-widget-ohio_simple_products .image-holder {
+                height: 100%;
+            }
+            body.home .elementor-element-a0d93dd .elementor-widget-ohio_banner,
+            body.home .elementor-element-a0d93dd .elementor-widget-container,
+            body.home .elementor-element-a0d93dd .ohio-banner-sc,
+            body.home .elementor-element-a0d93dd .ohio-banner-sc > a,
+            body.home .elementor-element-a0d93dd .ohio-banner-sc .image-holder,
+            body.home .elementor-element-a0d93dd .ohio-banner-sc .overlay-details {
+                height: 430px;
+                min-height: 430px;
+                max-height: 430px;
+            }
+            body.home .elementor-element-a0d93dd .ohio-banner-sc .overlay-details {
+                padding: 30px 28px;
             }
         }
     </style>
