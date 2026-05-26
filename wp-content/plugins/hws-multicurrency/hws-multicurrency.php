@@ -43,6 +43,7 @@ final class HWS_Multicurrency {
 
         add_filter('woocommerce_get_variation_prices_hash', [__CLASS__, 'variation_prices_hash'], 20, 3);
         add_shortcode('hws_currency_switcher', [__CLASS__, 'currency_switcher_shortcode']);
+        add_action('wp_footer', [__CLASS__, 'render_header_switcher']);
 
         if (!self::rates_are_fresh()) {
             add_action('wp_loaded', [__CLASS__, 'update_rates']);
@@ -139,6 +140,74 @@ final class HWS_Multicurrency {
     }
 
     public static function currency_switcher_shortcode(): string {
+        return self::currency_switcher_html();
+    }
+
+    public static function render_header_switcher(): void {
+        if (is_admin()) {
+            return;
+        }
+
+        echo '<template id="hws-currency-switcher-template">' . self::currency_switcher_html('hws-currency-switcher--header') . '</template>';
+        ?>
+        <style>
+            .hws-currency-switcher {
+                display: inline-flex;
+                align-items: center;
+                gap: 2px;
+                padding: 3px;
+                border: 1px solid rgba(40, 40, 40, 0.12);
+                border-radius: 999px;
+                background: rgba(255, 255, 255, 0.42);
+                white-space: nowrap;
+            }
+            .hws-currency-switcher__item {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-width: 42px;
+                min-height: 30px;
+                padding: 0 10px;
+                border-radius: 999px;
+                color: rgba(40, 40, 40, 0.72);
+                font-size: 13px;
+                font-weight: 700;
+                line-height: 1;
+                text-decoration: none;
+            }
+            .hws-currency-switcher__item:hover,
+            .hws-currency-switcher__item.is-active {
+                background: #282828;
+                color: #fff;
+            }
+            .menu-optional .hws-currency-switcher-holder {
+                display: flex;
+                align-items: center;
+                margin-right: 8px;
+            }
+            @media (max-width: 768px) {
+                .menu-optional .hws-currency-switcher-holder {
+                    display: none;
+                }
+            }
+        </style>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                var menu = document.querySelector('.menu-optional');
+                var firstIcon = menu ? menu.querySelector('.icon-button-holder') : null;
+                var template = document.getElementById('hws-currency-switcher-template');
+                if (!menu || !firstIcon || !template || menu.querySelector('.hws-currency-switcher-holder')) return;
+
+                var holder = document.createElement('li');
+                holder.className = 'hws-currency-switcher-holder';
+                holder.innerHTML = template.innerHTML;
+                firstIcon.insertAdjacentElement('beforebegin', holder);
+            });
+        </script>
+        <?php
+    }
+
+    private static function currency_switcher_html(string $modifier = ''): string {
         $current = self::current_currency();
         $items = [];
         foreach (['USD', 'UZS', 'AZN'] as $currency) {
@@ -152,7 +221,9 @@ final class HWS_Multicurrency {
             );
         }
 
-        return '<nav class="hws-currency-switcher" aria-label="Currency">' . implode('', $items) . '</nav>';
+        $class = trim('hws-currency-switcher ' . $modifier);
+
+        return '<nav class="' . esc_attr($class) . '" aria-label="Валюта">' . implode('', $items) . '</nav>';
     }
 
     public static function current_currency(): string {
@@ -316,4 +387,3 @@ final class HWS_Multicurrency {
 HWS_Multicurrency::init();
 register_activation_hook(__FILE__, ['HWS_Multicurrency', 'activate']);
 register_deactivation_hook(__FILE__, ['HWS_Multicurrency', 'deactivate']);
-
