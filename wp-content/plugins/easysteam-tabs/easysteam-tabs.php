@@ -107,6 +107,63 @@ add_action('wp_head', function() {
             color: #ffffff !important;
             text-decoration: none;
         }
+        body.home .elementor-widget-ohio_simple_products .woocommerce > .products {
+            display: grid !important;
+            grid-template-columns: repeat(var(--hws-home-product-columns, 3), minmax(0, 1fr));
+            gap: 26px;
+            align-items: stretch;
+        }
+        body.home .elementor-widget-ohio_simple_products .woocommerce.columns-2 {
+            --hws-home-product-columns: 2;
+        }
+        body.home .elementor-widget-ohio_simple_products .woocommerce.columns-3 {
+            --hws-home-product-columns: 3;
+        }
+        body.home .elementor-widget-ohio_simple_products .products > li.product {
+            width: auto !important;
+            margin: 0 !important;
+            float: none !important;
+            height: 100%;
+        }
+        body.home .elementor-widget-ohio_simple_products .product-item {
+            height: 100%;
+            min-height: 470px;
+            display: flex;
+            flex-direction: column;
+            background: rgba(255, 255, 255, 0.28);
+        }
+        body.home .elementor-widget-ohio_simple_products .image-holder {
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        body.home .elementor-widget-ohio_simple_products .image-holder img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            padding: 18px;
+        }
+        body.home .elementor-widget-ohio_simple_products .card-details {
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+        body.home .elementor-widget-ohio_simple_products .woo-product-name {
+            display: -webkit-box;
+            min-height: 2.8em;
+            overflow: hidden;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+        body.home .elementor-widget-ohio_banner .banner {
+            min-height: 100%;
+        }
+        body.home .elementor-widget-ohio_banner .banner .heading .title {
+            letter-spacing: 0;
+        }
         @media (max-width: 768px) {
             .hws-service-page .hws-service-lead {
                 font-size: 20px;
@@ -117,6 +174,15 @@ add_action('wp_head', function() {
             .hws-service-cta {
                 grid-template-columns: 1fr;
                 padding: 26px 22px;
+            }
+            body.home .elementor-widget-ohio_simple_products .woocommerce > .products {
+                grid-template-columns: 1fr;
+            }
+            body.home .elementor-widget-ohio_simple_products .product-item {
+                min-height: 430px;
+            }
+            body.home .elementor-widget-ohio_simple_products .image-holder {
+                height: 260px;
             }
         }
     </style>
