@@ -224,6 +224,9 @@ add_action('wp_head', function() {
             order: 2;
             margin-top: 18px;
         }
+        body.home .elementor-element-950ea57 {
+            align-items: flex-start !important;
+        }
         body.home .elementor-element-a377d0d,
         body.home .elementor-element-a377d0d .elementor-widget-container,
         body.home .elementor-element-a377d0d .ohio-banner-sc,
@@ -245,6 +248,13 @@ add_action('wp_head', function() {
         }
         body.home .elementor-element-12a3ef6 {
             align-self: flex-start !important;
+            height: auto !important;
+        }
+        body.home .elementor-element-12a3ef6,
+        body.home .elementor-element-12a3ef6 .elementor-widget-ohio_simple_products,
+        body.home .elementor-element-12a3ef6 .elementor-widget-container,
+        body.home .elementor-element-177558b .woocommerce {
+            min-height: 0 !important;
         }
         body.home .elementor-element-177558b .woocommerce > .products {
             align-items: flex-start !important;
