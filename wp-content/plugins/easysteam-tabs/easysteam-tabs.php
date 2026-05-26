@@ -40,6 +40,89 @@ add_filter('gettext_with_context', function($translated, $text) {
     return hws_ru_template_string($translated, $text);
 }, 20, 2);
 
+add_action('wp_head', function() {
+    ?>
+    <style>
+        .hws-service-page {
+            max-width: 1040px;
+            margin: 0 auto 80px;
+            color: #343434;
+        }
+        .hws-service-page .hws-service-lead {
+            max-width: 860px;
+            margin: 0 0 42px;
+            color: #252525;
+            font-size: 24px;
+            line-height: 1.45;
+            font-weight: 500;
+        }
+        .hws-service-section {
+            padding: 30px 0;
+            border-top: 1px solid rgba(17, 24, 39, 0.12);
+        }
+        .hws-service-section h2 {
+            margin: 0 0 16px;
+            color: #1f1f1d;
+            font-size: 28px;
+            line-height: 1.18;
+            font-weight: 700;
+            letter-spacing: 0;
+        }
+        .hws-service-section p,
+        .hws-service-section li {
+            color: #4f4f4b;
+            font-size: 17px;
+            line-height: 1.65;
+        }
+        .hws-service-section ul {
+            display: grid;
+            gap: 10px;
+            margin: 0;
+            padding-left: 22px;
+        }
+        .hws-service-cta {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 24px;
+            align-items: center;
+            margin-top: 36px;
+            padding: 34px 38px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.7);
+            box-shadow: 0 18px 44px rgba(17, 24, 39, 0.08);
+        }
+        .hws-service-cta strong {
+            color: #151515;
+            font-size: 22px;
+        }
+        .hws-service-cta p {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 0;
+        }
+        .hws-service-cta .button {
+            border-radius: 16px;
+            background: #151515;
+            color: #ffffff !important;
+            text-decoration: none;
+        }
+        @media (max-width: 768px) {
+            .hws-service-page .hws-service-lead {
+                font-size: 20px;
+            }
+            .hws-service-section h2 {
+                font-size: 24px;
+            }
+            .hws-service-cta {
+                grid-template-columns: 1fr;
+                padding: 26px 22px;
+            }
+        }
+    </style>
+    <?php
+});
+
 add_action('woocommerce_before_calculate_totals', function($cart) {
     if (is_admin() && !defined('DOING_AJAX')) {
         return;
