@@ -224,31 +224,38 @@ add_action('wp_head', function() {
             order: 2;
             margin-top: 18px;
         }
-        body.home .elementor-element-5450c9d .elementor-element-a377d0d,
-        body.home .elementor-element-5450c9d .elementor-element-a377d0d .elementor-widget-container,
-        body.home .elementor-element-5450c9d .elementor-element-a377d0d .ohio-banner-sc,
-        body.home .elementor-element-5450c9d .elementor-element-a377d0d .ohio-banner-sc > a,
-        body.home .elementor-element-5450c9d .elementor-element-a377d0d .image-holder {
+        body.home .elementor-element-950ea57 {
+            align-items: stretch;
+        }
+        body.home .elementor-element-fbfb2bb,
+        body.home .elementor-element-12a3ef6 {
+            align-self: stretch;
+        }
+        body.home .elementor-element-a377d0d,
+        body.home .elementor-element-a377d0d .elementor-widget-container,
+        body.home .elementor-element-a377d0d .ohio-banner-sc,
+        body.home .elementor-element-a377d0d .ohio-banner-sc > a,
+        body.home .elementor-element-a377d0d .image-holder {
             width: 100%;
             height: 520px;
             min-height: 520px;
             max-height: 520px;
         }
-        body.home .elementor-element-5450c9d .elementor-element-a377d0d .image-holder img {
+        body.home .elementor-element-a377d0d .image-holder img {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
-        body.home .elementor-element-5450c9d .elementor-element-a377d0d .overlay-details {
+        body.home .elementor-element-a377d0d .overlay-details {
             min-height: 520px;
             padding: 44px 48px 42px;
         }
-        body.home .elementor-element-5450c9d .elementor-widget-ohio_simple_products .product-item {
+        body.home .elementor-element-177558b .product-item {
             min-height: 520px;
         }
-        body.home .elementor-element-5450c9d .elementor-widget-ohio_simple_products .product-item-thumbnail,
-        body.home .elementor-element-5450c9d .elementor-widget-ohio_simple_products .product-item-thumbnail > div[data-cursor-class],
-        body.home .elementor-element-5450c9d .elementor-widget-ohio_simple_products .product-item-thumbnail .image-holder {
+        body.home .elementor-element-177558b .product-item-thumbnail,
+        body.home .elementor-element-177558b .product-item-thumbnail > div[data-cursor-class],
+        body.home .elementor-element-177558b .product-item-thumbnail .image-holder {
             height: 290px;
         }
         @media (max-width: 768px) {
@@ -288,17 +295,17 @@ add_action('wp_head', function() {
             body.home .elementor-element-a0d93dd .ohio-banner-sc .overlay-details {
                 padding: 30px 28px;
             }
-            body.home .elementor-element-5450c9d .elementor-element-a377d0d,
-            body.home .elementor-element-5450c9d .elementor-element-a377d0d .elementor-widget-container,
-            body.home .elementor-element-5450c9d .elementor-element-a377d0d .ohio-banner-sc,
-            body.home .elementor-element-5450c9d .elementor-element-a377d0d .ohio-banner-sc > a,
-            body.home .elementor-element-5450c9d .elementor-element-a377d0d .image-holder,
-            body.home .elementor-element-5450c9d .elementor-element-a377d0d .overlay-details {
+            body.home .elementor-element-a377d0d,
+            body.home .elementor-element-a377d0d .elementor-widget-container,
+            body.home .elementor-element-a377d0d .ohio-banner-sc,
+            body.home .elementor-element-a377d0d .ohio-banner-sc > a,
+            body.home .elementor-element-a377d0d .image-holder,
+            body.home .elementor-element-a377d0d .overlay-details {
                 height: 430px;
                 min-height: 430px;
                 max-height: 430px;
             }
-            body.home .elementor-element-5450c9d .elementor-element-a377d0d .overlay-details {
+            body.home .elementor-element-a377d0d .overlay-details {
                 padding: 30px 28px;
             }
         }
