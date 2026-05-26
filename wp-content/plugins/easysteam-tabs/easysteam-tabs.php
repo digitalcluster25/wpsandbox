@@ -276,6 +276,40 @@ add_action('wp_head', function() {
             justify-content: flex-start !important;
             min-height: 150px !important;
         }
+        body.home .elementor-element-b65c4f9 {
+            align-items: flex-start !important;
+        }
+        body.home .elementor-element-d89af63,
+        body.home .elementor-element-7cd0d7b,
+        body.home .elementor-element-7cd0d7b .elementor-widget-container,
+        body.home .elementor-element-7cd0d7b .ohio-banner-sc,
+        body.home .elementor-element-7cd0d7b .ohio-banner-sc > a,
+        body.home .elementor-element-7cd0d7b .image-holder {
+            width: 100%;
+            height: 520px;
+            min-height: 520px;
+            max-height: 520px;
+        }
+        body.home .elementor-element-7cd0d7b .image-holder img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        body.home .elementor-element-7cd0d7b .overlay-details {
+            min-height: 520px;
+            padding: 42px 38px 36px;
+        }
+        body.home .elementor-element-7cd0d7b .heading {
+            display: flex;
+            flex-direction: column;
+        }
+        body.home .elementor-element-7cd0d7b .heading .title {
+            order: 1;
+        }
+        body.home .elementor-element-7cd0d7b .heading .subtitle {
+            order: 2;
+            margin-top: 16px;
+        }
         @media (max-width: 768px) {
             .hws-service-page .hws-service-lead {
                 font-size: 20px;
@@ -324,6 +358,20 @@ add_action('wp_head', function() {
                 max-height: 430px;
             }
             body.home .elementor-element-a377d0d .overlay-details {
+                padding: 30px 28px;
+            }
+            body.home .elementor-element-d89af63,
+            body.home .elementor-element-7cd0d7b,
+            body.home .elementor-element-7cd0d7b .elementor-widget-container,
+            body.home .elementor-element-7cd0d7b .ohio-banner-sc,
+            body.home .elementor-element-7cd0d7b .ohio-banner-sc > a,
+            body.home .elementor-element-7cd0d7b .image-holder,
+            body.home .elementor-element-7cd0d7b .overlay-details {
+                height: 430px;
+                min-height: 430px;
+                max-height: 430px;
+            }
+            body.home .elementor-element-7cd0d7b .overlay-details {
                 padding: 30px 28px;
             }
         }
