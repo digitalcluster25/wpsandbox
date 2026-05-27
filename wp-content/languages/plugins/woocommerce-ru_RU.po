@@ -2,7 +2,7 @@
 # This file is distributed under the same license as the Plugins - WooCommerce - Stable (latest release) package.
 msgid ""
 msgstr ""
-"PO-Revision-Date: 2026-05-21 16:28:06+0000\n"
+"PO-Revision-Date: 2026-05-27 05:50:16+0000\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -450,15 +450,15 @@ msgstr "Товары заказа {номер_заказа} на {site_title} о
 msgid "Failed to delete the shipping provider."
 msgstr "Не удалось удалить службу доставки."
 
-#. translators: %s: provider name
-#: includes/class-wc-ajax.php:3894
-msgid "Cannot delete \"%s\" because it is used by existing fulfillments. Remove all fulfillments using this provider first."
-msgstr "Невозможно удалить «%s», так как он используется в процессе выполнения существующих заказов. Сначала завершите все процессы исполнения заказов, предполагающие доставку силами этого сервиса."
-
 #. translators: %s: URL to blog post about this change.
 #: includes/admin/views/html-notice-sync-on-read-disabled.php:20
 msgid "Compatibility mode for HPOS no longer pulls order changes made to the posts database back into your orders automatically. If your site uses custom code or plugins that modify orders outside of WooCommerce, this may affect how order data is handled. <a href=\"%s\">Learn more about this change and what to do</a>."
 msgstr "В режиме совместимости для HPOS изменения, внесённые в базу данных публикаций, больше не применяются автоматически к вашим заказам.  Если на вашем сайте используется пользовательский код или плагины, которые изменяют заказы вне WooCommerce, это может повлиять на обработку данных о заказах. <a href=\"%s\">Узнайте больше об этом изменении и о том, что нужно делать</a>."
+
+#. translators: %s: provider name
+#: includes/class-wc-ajax.php:3894
+msgid "Cannot delete \"%s\" because it is used by existing fulfillments. Remove all fulfillments using this provider first."
+msgstr "Невозможно удалить «%s», так как он используется в процессе выполнения существующих заказов. Сначала завершите все процессы исполнения заказов, предполагающие доставку силами этого сервиса."
 
 #: includes/admin/views/html-notice-sync-on-read-disabled.php:15
 msgid "HPOS order \"sync on read\" has been disabled"
@@ -899,10 +899,6 @@ msgstr "Тип окружения"
 msgid "The current environment type set for this site."
 msgstr "Текущий тип среды, установленный для данного сайта."
 
-#: includes/admin/settings/views/settings-tax.php:24
-msgid "This option is important as it will affect how you input prices. If you select \"Yes\", enter prices including your base location's tax rate, the baseline for tax calculations. Changing this option will not update existing products."
-msgstr "Этот параметр важен, поскольку он влияет на способ ввода цен. Если он включен, вводите цены, включая налоговую ставку своего региона, которая является базовой для расчёта налогов. Изменение этого параметра не приведет к обновлению существующих товаров."
-
 #. translators: %d: order item ID
 #: includes/class-wc-order-item-fee.php:211
 #: includes/class-wc-order-item-product.php:203
@@ -918,6 +914,10 @@ msgstr "Видимость товара в кассе"
 #: includes/rest-api/Controllers/Version2/class-wc-rest-system-status-v2-controller.php:210
 msgid "The WordPress environment type."
 msgstr "Тип среды WordPress."
+
+#: includes/admin/settings/views/settings-tax.php:24
+msgid "This option is important as it will affect how you input prices. If you select \"Yes\", enter prices including your base location's tax rate, the baseline for tax calculations. Changing this option will not update existing products."
+msgstr "Этот параметр важен, поскольку он влияет на способ ввода цен. Если он включен, вводите цены, включая налоговую ставку своего региона, которая является базовой для расчёта налогов. Изменение этого параметра не приведет к обновлению существующих товаров."
 
 #: includes/rest-api/Controllers/Version3/class-wc-rest-product-variations-controller.php:1237
 msgid "Limit result set to variations visible in Point of Sale."
@@ -988,10 +988,6 @@ msgstr "Отправлять заголовки управления кэшем 
 msgid "Enables including ETag and Cache-Control headers, and returning 304 Not Modified responses, for REST API endpoints configured as cacheable."
 msgstr "Включает добавление заголовков ETag и Cache-Control и возврат ответа 304 Not Modified для эндпойнтов REST API, настроенных как кэшируемые."
 
-#: includes/admin/settings/class-wc-settings-accounts.php:135
-msgid "Generate a login for the account using first and/or last name. If neither is usable (e.g. invalid or missing) the email address will be used. If this option is unchecked, customers will need to set a username during account creation"
-msgstr "Генерировать логин учётной записи, используя имя и/или фамилию. Если ни одно из них невозможно использовать (например, оно недействительно или отсутствует), будет использоваться адрес электронной почты. Если эта опция не включена, клиентам необходимо будет указывать имя пользователя при создании учётной записи."
-
 #: includes/admin/settings/class-wc-settings-advanced.php:51
 msgid "REST API keys"
 msgstr "Ключи REST API"
@@ -999,6 +995,10 @@ msgstr "Ключи REST API"
 #: includes/admin/settings/class-wc-settings-advanced.php:56
 msgid "REST API caching"
 msgstr "Кэширование REST API"
+
+#: includes/admin/settings/class-wc-settings-accounts.php:135
+msgid "Generate a login for the account using first and/or last name. If neither is usable (e.g. invalid or missing) the email address will be used. If this option is unchecked, customers will need to set a username during account creation"
+msgstr "Генерировать логин учётной записи, используя имя и/или фамилию. Если ни одно из них невозможно использовать (например, оно недействительно или отсутствует), будет использоваться адрес электронной почты. Если эта опция не включена, клиентам необходимо будет указывать имя пользователя при создании учётной записи."
 
 #: includes/admin/settings/class-wc-settings-advanced.php:459
 msgid "REST API response cache"
@@ -2293,13 +2293,13 @@ msgstr "Включить WooCommerce MCP (Model Context Protocol) для упр�
 msgid "Clear Customer Sessions When Empty"
 msgstr "Очищать пустые сессии клиентов"
 
-#: src/Internal/Features/FeaturesController.php:536
-msgid "[Performance] Removes session cookies for non-logged in customers when session data is empty, improving page caching performance. May cause compatibility issues with extensions that depend on the session cookie without using session data."
-msgstr "[Производительность] Удаляет сессионные куки неавторизованных клиентов, когда данные сессии пусты, что повышает производительность кэширования страниц. Может вызвать проблемы совместимости с расширениями, зависящими от сессионных куки, но не используют данные сессии."
-
 #: src/Internal/Features/FeaturesController.php:526
 msgid "WooCommerce MCP"
 msgstr "WooCommerce MCP"
+
+#: src/Internal/Features/FeaturesController.php:536
+msgid "[Performance] Removes session cookies for non-logged in customers when session data is empty, improving page caching performance. May cause compatibility issues with extensions that depend on the session cookie without using session data."
+msgstr "[Производительность] Удаляет сессионные куки неавторизованных клиентов, когда данные сессии пусты, что повышает производительность кэширования страниц. Может вызвать проблемы совместимости с расширениями, зависящими от сессионных куки, но не используют данные сессии."
 
 #: src/Internal/MCP/MCPAdapterProvider.php:132
 msgid "WooCommerce MCP Server"
@@ -2379,6 +2379,14 @@ msgstr "Образец PDF-файла для скачивания"
 msgid "Set your store's address, visibility, currency, language, and timezone."
 msgstr "Укажите адрес своего магазина, его видимость, валюту, язык и часовой пояс."
 
+#: src/Internal/RestApi/Routes/V4/Settings/Account/Schema/AccountSettingsSchema.php:124
+#: src/Internal/RestApi/Routes/V4/Settings/Emails/Schema/EmailsSettingsSchema.php:203
+#: src/Internal/RestApi/Routes/V4/Settings/General/Schema/GeneralSettingsSchema.php:124
+#: src/Internal/RestApi/Routes/V4/Settings/PaymentGateways/Schema/AbstractPaymentGatewaySettingsSchema.php:177
+#: src/Internal/RestApi/Routes/V4/Settings/Products/Schema/ProductSettingsSchema.php:126
+msgid "Available options for select/multiselect fields."
+msgstr "Доступные опции одиночного/множественного выбора полей."
+
 #: src/Internal/RestApi/Routes/V4/Settings/Account/Schema/AccountSettingsSchema.php:54
 #: src/Internal/RestApi/Routes/V4/Settings/Email/Schema/EmailSettingsSchema.php:61
 #: src/Internal/RestApi/Routes/V4/Settings/Emails/Schema/EmailsSettingsSchema.php:128
@@ -2389,14 +2397,6 @@ msgstr "Укажите адрес своего магазина, его види
 #: src/Internal/RestApi/Routes/V4/Settings/Tax/Schema/TaxSettingsSchema.php:54
 msgid "Flat key-value mapping of all setting field values."
 msgstr "Плоское сопоставление значений всех ключей и полей настроек."
-
-#: src/Internal/RestApi/Routes/V4/Settings/Account/Schema/AccountSettingsSchema.php:124
-#: src/Internal/RestApi/Routes/V4/Settings/Emails/Schema/EmailsSettingsSchema.php:203
-#: src/Internal/RestApi/Routes/V4/Settings/General/Schema/GeneralSettingsSchema.php:124
-#: src/Internal/RestApi/Routes/V4/Settings/PaymentGateways/Schema/AbstractPaymentGatewaySettingsSchema.php:177
-#: src/Internal/RestApi/Routes/V4/Settings/Products/Schema/ProductSettingsSchema.php:126
-msgid "Available options for select/multiselect fields."
-msgstr "Доступные опции одиночного/множественного выбора полей."
 
 #: src/Internal/RestApi/Routes/V4/Settings/Account/Schema/AccountSettingsSchema.php:129
 #: src/Internal/RestApi/Routes/V4/Settings/Emails/Schema/EmailsSettingsSchema.php:198
@@ -2740,11 +2740,6 @@ msgstr "Оплата через PayPal одобрена. ID заказа PayPal:
 msgid "PayPal payment approval failed. PayPal Order ID: %1$s. Status: %2$s"
 msgstr "Не удалось подтвердить платёж PayPal. ID заказа PayPal: %1$s. Статус: %2$s."
 
-#. translators: 1: opening <a> tag, 2: closing </a> tag
-#: src/Gateways/PayPal/Notices.php:143
-msgid "WooCommerce has upgraded your PayPal integration from PayPal Standard to PayPal Payments (PPCP), for a more reliable and modern checkout experience. If you do not prefer the upgraded integration in WooCommerce, we recommend switching to %1$sPayPal Payments%2$s extension."
-msgstr "WooCommerce обновила интеграцию с PayPal Standard на PayPal Payments (PPCP) для более надёжного и современного оформления заказа. Если вам не подходит обновлённая интеграция в WooCommerce, рекомендуется перейти на расширение %1$sPayPal Payments%2$s."
-
 #. translators: %1$s: Transaction ID
 #: src/Gateways/PayPal/WebhookHandler.php:159
 msgid "PayPal payment captured. Transaction ID: %1$s."
@@ -2767,6 +2762,11 @@ msgstr "Отображение кнопок PayPal"
 #: includes/gateways/paypal/includes/settings-paypal.php:73
 msgid "Enable PayPal buttons to offer PayPal, Venmo and Pay Later as express checkout options on product, cart, and checkout pages."
 msgstr "Включите кнопки PayPal, чтобы предлагать PayPal, Venmo и Pay Later в качестве вариантов экспресс-оформления заказа на страницах товара, корзины и оформления заказа."
+
+#. translators: 1: opening <a> tag, 2: closing </a> tag
+#: src/Gateways/PayPal/Notices.php:143
+msgid "WooCommerce has upgraded your PayPal integration from PayPal Standard to PayPal Payments (PPCP), for a more reliable and modern checkout experience. If you do not prefer the upgraded integration in WooCommerce, we recommend switching to %1$sPayPal Payments%2$s extension."
+msgstr "WooCommerce обновила интеграцию с PayPal Standard на PayPal Payments (PPCP) для более надёжного и современного оформления заказа. Если вам не подходит обновлённая интеграция в WooCommerce, рекомендуется перейти на расширение %1$sPayPal Payments%2$s."
 
 #: includes/gateways/paypal/class-wc-gateway-paypal.php:638
 msgid "We are unable to process your PayPal payment at this time. Please try again or use a different payment method."
@@ -3763,6 +3763,17 @@ msgstr "Массив метаданных."
 msgid "Whether to notify the customer about the fulfillment update."
 msgstr "Уведомлять ли клиента об обновлении выполнения."
 
+#: src/Admin/Features/Fulfillments/OrderFulfillmentsRestController.php:692
+#: src/Admin/Features/Fulfillments/OrderFulfillmentsRestController.php:745
+#: src/Admin/Features/Fulfillments/OrderFulfillmentsRestController.php:803
+#: src/Admin/Features/Fulfillments/OrderFulfillmentsRestController.php:851
+#: src/Admin/Features/Fulfillments/OrderFulfillmentsRestController.php:891
+#: src/Admin/Features/Fulfillments/OrderFulfillmentsRestController.php:941
+#: src/Admin/Features/Fulfillments/OrderFulfillmentsRestController.php:986
+#: src/Internal/RestApi/Routes/V4/Fulfillments/Controller.php:90
+msgid "Unique identifier for the order."
+msgstr "Уникальный идентификатор заказа."
+
 #: src/Admin/Features/Fulfillments/OrderFulfillmentsRestController.php:751
 #: src/Admin/Features/Fulfillments/OrderFulfillmentsRestController.php:809
 #: src/Admin/Features/Fulfillments/OrderFulfillmentsRestController.php:857
@@ -3774,17 +3785,6 @@ msgstr "Уведомлять ли клиента об обновлении вы�
 #: src/Internal/RestApi/Routes/V4/Fulfillments/Schema/FulfillmentSchema.php:41
 msgid "Unique identifier for the fulfillment."
 msgstr "Уникальный идентификатор выполнения."
-
-#: src/Admin/Features/Fulfillments/OrderFulfillmentsRestController.php:692
-#: src/Admin/Features/Fulfillments/OrderFulfillmentsRestController.php:745
-#: src/Admin/Features/Fulfillments/OrderFulfillmentsRestController.php:803
-#: src/Admin/Features/Fulfillments/OrderFulfillmentsRestController.php:851
-#: src/Admin/Features/Fulfillments/OrderFulfillmentsRestController.php:891
-#: src/Admin/Features/Fulfillments/OrderFulfillmentsRestController.php:941
-#: src/Admin/Features/Fulfillments/OrderFulfillmentsRestController.php:986
-#: src/Internal/RestApi/Routes/V4/Fulfillments/Controller.php:90
-msgid "Unique identifier for the order."
-msgstr "Уникальный идентификатор заказа."
 
 #: src/Admin/Features/Fulfillments/OrderFulfillmentsRestController.php:655
 msgid "Order ID is required."
@@ -36575,6 +36575,13 @@ msgstr "Дата создания отзыва в часовом поясе са
 msgid "Review rating (0 to 5)."
 msgstr "Оценка отзыва (0 - 5)"
 
+#: includes/rest-api/Controllers/Version1/class-wc-rest-product-reviews-v1-controller.php:570
+#: includes/rest-api/Controllers/Version2/class-wc-rest-product-reviews-v2-controller.php:179
+#: includes/rest-api/Controllers/Version3/class-wc-rest-product-reviews-controller.php:894
+#: src/StoreApi/Schemas/V1/ProductReviewSchema.php:102
+msgid "Reviewer name."
+msgstr "Имя автора отзыва."
+
 #: includes/rest-api/Controllers/Version1/class-wc-rest-product-categories-v1-controller.php:238
 #: includes/rest-api/Controllers/Version1/class-wc-rest-products-v1-controller.php:2179
 #: includes/rest-api/Controllers/Version1/class-wc-rest-products-v1-controller.php:2511
@@ -36588,13 +36595,6 @@ msgstr "Оценка отзыва (0 - 5)"
 #: src/Internal/RestApi/Routes/V4/Products/Controller.php:1753
 msgid "Image URL."
 msgstr "URL изображения."
-
-#: includes/rest-api/Controllers/Version1/class-wc-rest-product-reviews-v1-controller.php:570
-#: includes/rest-api/Controllers/Version2/class-wc-rest-product-reviews-v2-controller.php:179
-#: includes/rest-api/Controllers/Version3/class-wc-rest-product-reviews-controller.php:894
-#: src/StoreApi/Schemas/V1/ProductReviewSchema.php:102
-msgid "Reviewer name."
-msgstr "Имя автора отзыва."
 
 #: includes/rest-api/Controllers/Version1/class-wc-rest-product-reviews-v1-controller.php:575
 #: includes/rest-api/Controllers/Version2/class-wc-rest-product-reviews-v2-controller.php:184
@@ -41138,6 +41138,11 @@ msgstr "Инструкции"
 msgid "Instructions that will be added to the thank you page and emails."
 msgstr "Инструкции, которые будут добавлены на страницу благодарности и в письмо."
 
+#: includes/gateways/bacs/class-wc-gateway-bacs.php:169
+#: assets/client/admin/chunks/5875.js:1
+msgid "Bank name"
+msgstr "Название банка"
+
 #: includes/gateways/bacs/class-wc-gateway-bacs.php:114
 #: includes/gateways/cheque/class-wc-gateway-cheque.php:83
 #: includes/gateways/paypal/includes/settings-paypal.php:24
@@ -41149,11 +41154,6 @@ msgstr "Инструкции, которые будут добавлены на 
 #: src/Internal/RestApi/Routes/V4/Settings/PaymentGateways/Schema/AbstractPaymentGatewaySettingsSchema.php:288
 msgid "This controls the title which the user sees during checkout."
 msgstr "Заголовок, который видит пользователь в процессе оформления заказа."
-
-#: includes/gateways/bacs/class-wc-gateway-bacs.php:169
-#: assets/client/admin/chunks/5875.js:1
-msgid "Bank name"
-msgstr "Название банка"
 
 #: includes/gateways/bacs/class-wc-gateway-bacs.php:171
 #: includes/gateways/bacs/class-wc-gateway-bacs.php:360
@@ -42004,12 +42004,6 @@ msgstr "Имя пользователя аккаунта"
 #: includes/class-wc-checkout.php:1289
 msgid "We were unable to process your order, please try again."
 msgstr "Мы не смогли обработать ваш заказ. Пожалуйста, попробуйте ещё раз."
-
-#. translators: %s: shipping location (prefix e.g. 'to' + ISO 3166-1 alpha-2
-#. country code)
-#: includes/class-wc-checkout.php:961
-msgid "Unfortunately <strong>we do not ship %s</strong>. Please enter an alternative shipping address."
-msgstr "К сожалению мы <strong>не производим доставку в %s</strong>. Пожалуйста укажите другой адрес доставки."
 
 #: includes/class-wc-comments.php:228
 msgid "Please rate the product."
@@ -45046,6 +45040,14 @@ msgstr "Или укажите ID налоговой ставки:"
 msgid "Downloadable products"
 msgstr "Скачиваемые товары"
 
+#. translators: single or plural number of orders
+#: includes/admin/reports/class-wc-report-customer-list.php:56
+msgid "%s previous order linked"
+msgid_plural "%s previous orders linked"
+msgstr[0] "Связан %s предыдущий заказ"
+msgstr[1] "Связано %s предыдущих заказа"
+msgstr[2] "Связано %s предыдущих заказов"
+
 #: includes/admin/importers/class-wc-product-csv-importer-controller.php:624
 #: includes/admin/importers/class-wc-product-csv-importer-controller.php:810
 #: includes/admin/meta-boxes/views/html-order-items.php:479
@@ -45059,14 +45061,6 @@ msgstr "Скачиваемые товары"
 #: src/Internal/Features/ProductBlockEditor/ProductTemplates/SimpleProductTemplate.php:331
 msgid "Tax class"
 msgstr "Налоговый класс"
-
-#. translators: single or plural number of orders
-#: includes/admin/reports/class-wc-report-customer-list.php:56
-msgid "%s previous order linked"
-msgid_plural "%s previous orders linked"
-msgstr[0] "Связан %s предыдущий заказ"
-msgstr[1] "Связано %s предыдущих заказа"
-msgstr[2] "Связано %s предыдущих заказов"
 
 #: includes/admin/importers/class-wc-product-csv-importer-controller.php:641
 #: includes/admin/importers/class-wc-product-csv-importer-controller.php:803
