@@ -57,7 +57,7 @@ add_action('wp_head', function() {
 add_action('wp_body_open', function() {
 ?>
 <div class="hws-announcement-bar">
-    <span class="hws-msg active hws-desktop-only" data-index="0">Игорь Костин консультирует лично · 17 лет банного строительства</span>
+    <span class="hws-msg active hws-desktop-only" data-index="0">Поставка и монтаж банных печей в Ташкенте и Баку · Консультация бесплатно →</span>
     <span class="hws-msg hws-desktop-only" data-index="1">Монтаж нашей командой в Ташкенте и Баку · Юрлицо в UZ и AZ</span>
     <span class="hws-msg hws-mobile-show" data-index="2">Бесплатный расчёт мощности <a href="#calculator">→ Рассчитать</a></span>
 </div>
