@@ -1,0 +1,737 @@
+<?php
+/**
+ * Plugin Name: HWS Description Formatter
+ * Description: Форматирует и переводит тексты товаров через OpenRouter AI.
+ * Version: 1.1.0
+ * Author: HWS
+ */
+
+defined('ABSPATH') || exit;
+
+final class HWS_Desc_Formatter {
+
+    private const FORMAT_META_KEY    = '_hws_desc_formatted';
+    private const TRANSLATE_META_KEY = '_hws_desc_translated';
+    private const OPT_KEY            = 'hws_formatter_settings';
+    private const API_URL            = 'https://openrouter.ai/api/v1/chat/completions';
+
+    private const FORMAT_PROMPT = <<<'PROMPT'
+Ты — редактор текстов для интернет-магазина. Тебе передают описание товара в виде сплошного текста или HTML без структуры.
+
+Задача: отформатируй описание в чистый HTML следующего вида:
+- Раздели текст на логические блоки (2–5 блоков)
+- Каждый блок начинается с <h3>Подзаголовок</h3>
+- За ним следует один или несколько <p>абзацев</p>
+- Не придумывай информацию, только структурируй имеющийся текст
+- Убери лишние переносы строк и артефакты HTML
+- Верни ТОЛЬКО готовый HTML без объяснений и markdown-разметки
+PROMPT;
+
+    private const TRANSLATE_PROMPT = <<<'PROMPT'
+Ты — переводчик карточек товаров для интернет-магазина.
+
+Тебе передают JSON с полями:
+- title
+- excerpt
+- content
+- from_language
+- to_language
+
+Задача:
+- переведи ВСЕ текстовые поля с языка from_language на язык to_language
+- title верни обычной строкой
+- excerpt и content переводи с сохранением HTML-структуры, если она есть
+- не добавляй новые факты и не сокращай исходный смысл
+- не возвращай объяснения
+- не используй markdown
+- верни ТОЛЬКО валидный JSON объекта вида:
+{
+  "title": "...",
+  "excerpt": "...",
+  "content": "..."
+}
+PROMPT;
+
+    public static function init(): void {
+        add_action('admin_menu', [__CLASS__, 'admin_menu']);
+        add_action('admin_enqueue_scripts', [__CLASS__, 'admin_assets']);
+        add_action('wp_ajax_hws_fmt_status', [__CLASS__, 'ajax_status']);
+        add_action('wp_ajax_hws_fmt_next', [__CLASS__, 'ajax_next']);
+        add_action('wp_ajax_hws_fmt_save_settings', [__CLASS__, 'ajax_save_settings']);
+    }
+
+    public static function admin_menu(): void {
+        add_submenu_page(
+            'woocommerce',
+            'Форматирование описаний',
+            'Форматирование описаний',
+            'manage_woocommerce',
+            'hws-desc-formatter',
+            [__CLASS__, 'render_page']
+        );
+    }
+
+    public static function admin_assets(string $hook): void {
+        if ($hook !== 'woocommerce_page_hws-desc-formatter') {
+            return;
+        }
+        ?>
+        <style>
+        #hws-fmt-wrap { max-width: 920px; }
+        #hws-fmt-wrap .hws-section { background:#fff; border:1px solid #c3c4c7; border-radius:4px; padding:20px; margin-bottom:20px; }
+        #hws-fmt-wrap h2 { margin-top:0; }
+        .hws-progress { display:none; margin-top:16px; }
+        .hws-bar-outer { height:20px; background:#f0f0f1; border-radius:10px; overflow:hidden; margin:8px 0; }
+        .hws-bar-inner { height:100%; background:#2271b1; border-radius:10px; transition:width .3s; }
+        .hws-log { max-height:220px; overflow-y:auto; background:#f6f7f7; border:1px solid #ddd; padding:10px; font-family:monospace; font-size:12px; border-radius:4px; margin-top:12px; }
+        .hws-log-ok { color:#2a7e2e; }
+        .hws-log-err { color:#b32d2e; }
+        .hws-log-info { color:#2271b1; }
+        .hws-controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:16px; }
+        .hws-translate-grid { display:grid; grid-template-columns:160px 1fr; gap:12px 16px; max-width:600px; align-items:center; }
+        @media (max-width: 782px) {
+            .hws-translate-grid { grid-template-columns:1fr; }
+        }
+        </style>
+        <?php
+    }
+
+    public static function render_page(): void {
+        $settings = self::settings();
+        ?>
+        <div class="wrap" id="hws-fmt-wrap">
+            <h1>Форматирование описаний товаров</h1>
+
+            <div class="hws-section">
+                <h2>Настройки OpenRouter</h2>
+                <table class="form-table" style="max-width:600px">
+                    <tr>
+                        <th>API Key</th>
+                        <td>
+                            <input
+                                type="password"
+                                id="hws-api-key"
+                                value="<?php echo esc_attr($settings['api_key'] ?? ''); ?>"
+                                style="width:100%"
+                                placeholder="sk-or-..."
+                            >
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Модель</th>
+                        <td>
+                            <input
+                                type="text"
+                                id="hws-model"
+                                value="<?php echo esc_attr($settings['model'] ?? 'meta-llama/llama-3.1-8b-instruct:free'); ?>"
+                                style="width:100%"
+                            >
+                            <p class="description">Одна модель используется и для форматирования, и для перевода.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Язык источника</th>
+                        <td>
+                            <input
+                                type="text"
+                                id="hws-translate-from"
+                                value="<?php echo esc_attr($settings['translate_from'] ?? 'Russian'); ?>"
+                                style="width:100%"
+                                placeholder="Например: Russian"
+                            >
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Язык перевода</th>
+                        <td>
+                            <input
+                                type="text"
+                                id="hws-translate-to"
+                                value="<?php echo esc_attr($settings['translate_to'] ?? 'English'); ?>"
+                                style="width:100%"
+                                placeholder="Например: English"
+                            >
+                        </td>
+                    </tr>
+                </table>
+                <button class="button" id="hws-save-settings">Сохранить настройки</button>
+                <span id="hws-settings-saved" style="display:none;margin-left:10px;color:#2a7e2e">✓ Сохранено</span>
+            </div>
+
+            <div class="hws-section">
+                <h2>Массовое форматирование</h2>
+                <p id="hws-format-status-text">Загрузка статистики…</p>
+                <div class="hws-controls">
+                    <button class="button button-primary" id="hws-format-start-btn" disabled>▶ Форматировать все</button>
+                    <button class="button" id="hws-format-stop-btn" style="display:none">⏹ Остановить</button>
+                    <button class="button" id="hws-format-reset-btn" style="display:none">↺ Сбросить все отметки</button>
+                </div>
+                <div class="hws-progress" id="hws-format-progress">
+                    <div class="hws-bar-outer"><div class="hws-bar-inner" id="hws-format-bar" style="width:0%"></div></div>
+                    <span id="hws-format-progress-label">0 / 0</span>
+                </div>
+                <div class="hws-log" id="hws-format-log"></div>
+            </div>
+
+            <div class="hws-section">
+                <h2>Массовый перевод карточек</h2>
+                <p>Переводит <strong>название</strong>, <strong>краткое описание</strong> и <strong>полное описание</strong> товара.</p>
+                <p id="hws-translate-status-text">Загрузка статистики…</p>
+                <div class="hws-controls">
+                    <button class="button button-primary" id="hws-translate-start-btn" disabled>▶ Перевести все</button>
+                    <button class="button" id="hws-translate-stop-btn" style="display:none">⏹ Остановить</button>
+                    <button class="button" id="hws-translate-reset-btn" style="display:none">↺ Сбросить все отметки</button>
+                </div>
+                <div class="hws-progress" id="hws-translate-progress">
+                    <div class="hws-bar-outer"><div class="hws-bar-inner" id="hws-translate-bar" style="width:0%"></div></div>
+                    <span id="hws-translate-progress-label">0 / 0</span>
+                </div>
+                <div class="hws-log" id="hws-translate-log"></div>
+            </div>
+        </div>
+
+        <script>
+        (function($){
+            var nonce = <?php echo wp_json_encode(wp_create_nonce('hws_formatter')); ?>;
+            var ajaxUrl = <?php echo wp_json_encode(admin_url('admin-ajax.php')); ?>;
+
+            function createRunner(mode, config) {
+                var running = false;
+                var total = 0;
+                var done = 0;
+
+                function log(msg, cls) {
+                    var ts = new Date().toLocaleTimeString();
+                    $(config.log).append('<div class="hws-log-' + (cls || 'info') + '">[' + ts + '] ' + msg + '</div>');
+                    var el = document.querySelector(config.log);
+                    el.scrollTop = el.scrollHeight;
+                }
+
+                function updateBar(d, t) {
+                    var pct = t > 0 ? Math.round(d / t * 100) : 0;
+                    $(config.bar).css('width', pct + '%');
+                    $(config.progressLabel).text(d + ' / ' + t);
+                }
+
+                function extraPayload() {
+                    if (mode !== 'translate') {
+                        return {};
+                    }
+                    return {
+                        from_lang: $('#hws-translate-from').val(),
+                        to_lang: $('#hws-translate-to').val()
+                    };
+                }
+
+                function loadStatus() {
+                    var payload = $.extend({
+                        action: 'hws_fmt_status',
+                        mode: mode,
+                        _ajax_nonce: nonce
+                    }, extraPayload());
+
+                    $.post(ajaxUrl, payload, function(r) {
+                        if (!r.success) {
+                            return;
+                        }
+                        total = r.data.total;
+                        done = r.data.processed;
+                        var left = total - done;
+
+                        $(config.statusText).html(
+                            'Всего товаров: <strong>' + total + '</strong> · ' +
+                            config.doneLabel + ': <strong>' + done + '</strong> · ' +
+                            'Осталось: <strong>' + left + '</strong>'
+                        );
+
+                        $(config.startBtn).prop('disabled', left === 0);
+                        if (done > 0) {
+                            $(config.resetBtn).show();
+                        }
+                        updateBar(done, total);
+
+                        if (left > 0 || done > 0) {
+                            $(config.progressWrap).show();
+                        }
+                    });
+                }
+
+                function finishRun() {
+                    $(config.stopBtn).hide();
+                    $(config.startBtn).show();
+                    loadStatus();
+                }
+
+                function processNext() {
+                    if (!running) {
+                        return;
+                    }
+
+                    var payload = $.extend({
+                        action: 'hws_fmt_next',
+                        mode: mode,
+                        _ajax_nonce: nonce
+                    }, extraPayload());
+
+                    $.post(ajaxUrl, payload, function(r) {
+                        if (!r.success) {
+                            log('Ошибка: ' + (r.data || 'неизвестная'), 'err');
+                            running = false;
+                            finishRun();
+                            return;
+                        }
+
+                        var d = r.data;
+                        if (d.done) {
+                            log('✓ ' + config.finishMessage, 'ok');
+                            running = false;
+                            finishRun();
+                            return;
+                        }
+
+                        done++;
+                        updateBar(done, total);
+
+                        if (d.skipped) {
+                            log('→ #' + d.id + ' ' + d.title + ' — пропущен (' + d.skipped_reason + ')', 'info');
+                        } else if (d.error) {
+                            log('✗ #' + d.id + ' ' + d.title + ' — ' + d.error, 'err');
+                        } else {
+                            log('✓ #' + d.id + ' ' + d.title, 'ok');
+                        }
+
+                        setTimeout(processNext, 300);
+                    }).fail(function() {
+                        log('Сетевая ошибка, повтор через 3с…', 'err');
+                        setTimeout(processNext, 3000);
+                    });
+                }
+
+                $(config.startBtn).on('click', function() {
+                    if (mode === 'translate') {
+                        var fromLang = ($('#hws-translate-from').val() || '').trim();
+                        var toLang = ($('#hws-translate-to').val() || '').trim();
+                        if (!fromLang || !toLang) {
+                            alert('Укажи язык источника и язык перевода.');
+                            return;
+                        }
+                    }
+
+                    running = true;
+                    $(config.startBtn).hide();
+                    $(config.stopBtn).show();
+                    $(config.progressWrap).show();
+                    $(config.log).empty();
+                    log(config.startMessage, 'info');
+                    processNext();
+                });
+
+                $(config.stopBtn).on('click', function() {
+                    running = false;
+                    log('Остановлено пользователем', 'info');
+                    finishRun();
+                });
+
+                $(config.resetBtn).on('click', function() {
+                    if (!confirm(config.resetConfirm)) {
+                        return;
+                    }
+                    var payload = $.extend({
+                        action: 'hws_fmt_status',
+                        mode: mode,
+                        reset: 1,
+                        _ajax_nonce: nonce
+                    }, extraPayload());
+
+                    $.post(ajaxUrl, payload, function() {
+                        log('Отметки сброшены', 'info');
+                        loadStatus();
+                    });
+                });
+
+                return {
+                    loadStatus: loadStatus
+                };
+            }
+
+            $('#hws-save-settings').on('click', function() {
+                $.post(ajaxUrl, {
+                    action: 'hws_fmt_save_settings',
+                    api_key: $('#hws-api-key').val(),
+                    model: $('#hws-model').val(),
+                    translate_from: $('#hws-translate-from').val(),
+                    translate_to: $('#hws-translate-to').val(),
+                    _ajax_nonce: nonce
+                }, function(r) {
+                    if (r.success) {
+                        $('#hws-settings-saved').fadeIn().delay(2000).fadeOut();
+                    }
+                });
+            });
+
+            var formatRunner = createRunner('format', {
+                doneLabel: 'Отформатировано',
+                startBtn: '#hws-format-start-btn',
+                stopBtn: '#hws-format-stop-btn',
+                resetBtn: '#hws-format-reset-btn',
+                statusText: '#hws-format-status-text',
+                progressWrap: '#hws-format-progress',
+                progressLabel: '#hws-format-progress-label',
+                bar: '#hws-format-bar',
+                log: '#hws-format-log',
+                startMessage: 'Запуск форматирования…',
+                finishMessage: 'Все товары отформатированы',
+                resetConfirm: 'Сбросить все отметки форматирования? Все товары будут отформатированы заново.'
+            });
+
+            var translateRunner = createRunner('translate', {
+                doneLabel: 'Переведено',
+                startBtn: '#hws-translate-start-btn',
+                stopBtn: '#hws-translate-stop-btn',
+                resetBtn: '#hws-translate-reset-btn',
+                statusText: '#hws-translate-status-text',
+                progressWrap: '#hws-translate-progress',
+                progressLabel: '#hws-translate-progress-label',
+                bar: '#hws-translate-bar',
+                log: '#hws-translate-log',
+                startMessage: 'Запуск перевода…',
+                finishMessage: 'Все товары переведены',
+                resetConfirm: 'Сбросить все отметки перевода? Все товары будут переведены заново.'
+            });
+
+            formatRunner.loadStatus();
+            translateRunner.loadStatus();
+        })(jQuery);
+        </script>
+        <?php
+    }
+
+    public static function ajax_status(): void {
+        check_ajax_referer('hws_formatter');
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die('Нет прав.');
+        }
+
+        $mode = self::requested_mode();
+        $meta_key = self::meta_key_for_mode($mode);
+
+        if (!empty($_POST['reset'])) {
+            global $wpdb;
+            $wpdb->delete($wpdb->postmeta, ['meta_key' => $meta_key]);
+        }
+
+        $total = (int) wp_count_posts('product')->publish;
+        $processed = (int) (new WP_Query([
+            'post_type' => 'product',
+            'post_status' => 'publish',
+            'posts_per_page' => -1,
+            'fields' => 'ids',
+            'meta_query' => [[
+                'key' => $meta_key,
+                'compare' => 'EXISTS',
+            ]],
+            'no_found_rows' => false,
+        ]))->found_posts;
+
+        wp_send_json_success([
+            'total' => $total,
+            'processed' => $processed,
+        ]);
+    }
+
+    public static function ajax_next(): void {
+        check_ajax_referer('hws_formatter');
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die('Нет прав.');
+        }
+
+        $mode = self::requested_mode();
+        $meta_key = self::meta_key_for_mode($mode);
+
+        $query = new WP_Query([
+            'post_type' => 'product',
+            'post_status' => 'publish',
+            'posts_per_page' => 1,
+            'fields' => 'ids',
+            'orderby' => 'ID',
+            'order' => 'ASC',
+            'meta_query' => [[
+                'key' => $meta_key,
+                'compare' => 'NOT EXISTS',
+            ]],
+        ]);
+
+        if (empty($query->posts)) {
+            wp_send_json_success(['done' => true]);
+        }
+
+        $product_id = (int) $query->posts[0];
+        $post = get_post($product_id);
+
+        if (!$post instanceof WP_Post) {
+            update_post_meta($product_id, $meta_key, 'error');
+            wp_send_json_success([
+                'done' => false,
+                'id' => $product_id,
+                'title' => 'unknown',
+                'error' => 'Товар не найден',
+            ]);
+        }
+
+        $title = $post->post_title;
+        $settings = self::settings();
+        $api_key = $settings['api_key'] ?? '';
+        $model = $settings['model'] ?? 'meta-llama/llama-3.1-8b-instruct:free';
+
+        if (!$api_key) {
+            wp_send_json_error('API ключ не задан');
+        }
+
+        if ($mode === 'format') {
+            $result = self::process_format($post, $api_key, $model);
+        } else {
+            $from_lang = self::request_string('from_lang', $settings['translate_from'] ?? '');
+            $to_lang = self::request_string('to_lang', $settings['translate_to'] ?? '');
+            $result = self::process_translate($post, $api_key, $model, $from_lang, $to_lang);
+        }
+
+        if (!empty($result['mark'])) {
+            update_post_meta($product_id, $meta_key, $result['mark']);
+        }
+
+        wp_send_json_success([
+            'done' => false,
+            'id' => $product_id,
+            'title' => $title,
+            'skipped' => !empty($result['skipped']),
+            'skipped_reason' => $result['skipped_reason'] ?? '',
+            'error' => $result['error'] ?? '',
+        ]);
+    }
+
+    public static function ajax_save_settings(): void {
+        check_ajax_referer('hws_formatter');
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die('Нет прав.');
+        }
+
+        update_option(self::OPT_KEY, [
+            'api_key' => sanitize_text_field(wp_unslash($_POST['api_key'] ?? '')),
+            'model' => sanitize_text_field(wp_unslash($_POST['model'] ?? '')),
+            'translate_from' => sanitize_text_field(wp_unslash($_POST['translate_from'] ?? '')),
+            'translate_to' => sanitize_text_field(wp_unslash($_POST['translate_to'] ?? '')),
+        ]);
+
+        wp_send_json_success();
+    }
+
+    private static function process_format(WP_Post $post, string $api_key, string $model): array {
+        $raw = (string) $post->post_content;
+
+        if (empty(trim(wp_strip_all_tags($raw)))) {
+            return [
+                'mark' => '1',
+                'skipped' => true,
+                'skipped_reason' => 'нет описания',
+            ];
+        }
+
+        $formatted = self::call_format_openrouter($raw, $api_key, $model);
+        if (is_wp_error($formatted)) {
+            return [
+                'mark' => 'error',
+                'error' => $formatted->get_error_message(),
+            ];
+        }
+
+        wp_update_post([
+            'ID' => $post->ID,
+            'post_content' => $formatted,
+        ]);
+
+        return ['mark' => '1'];
+    }
+
+    private static function process_translate(WP_Post $post, string $api_key, string $model, string $from_lang, string $to_lang): array {
+        if ($from_lang === '' || $to_lang === '') {
+            return [
+                'mark' => 'error',
+                'error' => 'Не заданы языки перевода',
+            ];
+        }
+
+        $payload = [
+            'title' => (string) $post->post_title,
+            'excerpt' => (string) $post->post_excerpt,
+            'content' => (string) $post->post_content,
+            'from_language' => $from_lang,
+            'to_language' => $to_lang,
+        ];
+
+        $has_text = false;
+        foreach (['title', 'excerpt', 'content'] as $field) {
+            if (trim(wp_strip_all_tags((string) $payload[$field])) !== '') {
+                $has_text = true;
+                break;
+            }
+        }
+
+        if (!$has_text) {
+            return [
+                'mark' => '1',
+                'skipped' => true,
+                'skipped_reason' => 'нет текстов для перевода',
+            ];
+        }
+
+        $translated = self::call_translate_openrouter($payload, $api_key, $model);
+        if (is_wp_error($translated)) {
+            return [
+                'mark' => 'error',
+                'error' => $translated->get_error_message(),
+            ];
+        }
+
+        wp_update_post([
+            'ID' => $post->ID,
+            'post_title' => $translated['title'],
+            'post_excerpt' => $translated['excerpt'],
+            'post_content' => $translated['content'],
+        ]);
+
+        return ['mark' => '1'];
+    }
+
+    private static function call_format_openrouter(string $raw_html, string $api_key, string $model): string|\WP_Error {
+        $text = wp_strip_all_tags($raw_html);
+        $text = preg_replace('/\s{3,}/', "\n\n", trim($text));
+
+        if (mb_strlen($text) < 30) {
+            return new \WP_Error('too_short', 'Слишком короткий текст');
+        }
+
+        $body = self::call_openrouter([
+            'model' => $model,
+            'max_tokens' => 2000,
+            'messages' => [
+                ['role' => 'system', 'content' => self::FORMAT_PROMPT],
+                ['role' => 'user', 'content' => $text],
+            ],
+        ], $api_key);
+
+        if (is_wp_error($body)) {
+            return $body;
+        }
+
+        $content = self::extract_message_content($body);
+        if (!$content) {
+            return new \WP_Error('empty_response', 'Пустой ответ от модели');
+        }
+
+        $content = self::strip_code_fences($content);
+
+        return trim($content);
+    }
+
+    private static function call_translate_openrouter(array $payload, string $api_key, string $model): array|\WP_Error {
+        $body = self::call_openrouter([
+            'model' => $model,
+            'max_tokens' => 4000,
+            'messages' => [
+                ['role' => 'system', 'content' => self::TRANSLATE_PROMPT],
+                ['role' => 'user', 'content' => wp_json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)],
+            ],
+            'response_format' => [
+                'type' => 'json_object',
+            ],
+        ], $api_key);
+
+        if (is_wp_error($body)) {
+            return $body;
+        }
+
+        $content = self::extract_message_content($body);
+        if (!$content) {
+            return new \WP_Error('empty_response', 'Пустой ответ от модели');
+        }
+
+        $decoded = json_decode(self::strip_code_fences($content), true);
+        if (!is_array($decoded)) {
+            return new \WP_Error('bad_json', 'Модель вернула невалидный JSON');
+        }
+
+        foreach (['title', 'excerpt', 'content'] as $field) {
+            if (!array_key_exists($field, $decoded)) {
+                return new \WP_Error('missing_field', 'В ответе модели отсутствует поле ' . $field);
+            }
+        }
+
+        return [
+            'title' => (string) $decoded['title'],
+            'excerpt' => (string) $decoded['excerpt'],
+            'content' => (string) $decoded['content'],
+        ];
+    }
+
+    private static function call_openrouter(array $payload, string $api_key): array|\WP_Error {
+        $response = wp_remote_post(self::API_URL, [
+            'timeout' => 90,
+            'headers' => [
+                'Authorization' => 'Bearer ' . $api_key,
+                'Content-Type' => 'application/json',
+                'HTTP-Referer' => get_site_url(),
+                'X-Title' => get_bloginfo('name'),
+            ],
+            'body' => wp_json_encode($payload),
+        ]);
+
+        if (is_wp_error($response)) {
+            return $response;
+        }
+
+        $code = wp_remote_retrieve_response_code($response);
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+
+        if ($code !== 200) {
+            $msg = $body['error']['message'] ?? ('HTTP ' . $code);
+            return new \WP_Error('api_error', $msg);
+        }
+
+        if (!is_array($body)) {
+            return new \WP_Error('bad_response', 'Некорректный ответ от API');
+        }
+
+        return $body;
+    }
+
+    private static function extract_message_content(array $body): string {
+        return (string) ($body['choices'][0]['message']['content'] ?? '');
+    }
+
+    private static function strip_code_fences(string $content): string {
+        $content = trim($content);
+        $content = preg_replace('/^```(?:json|html)?\s*/i', '', $content);
+        $content = preg_replace('/\s*```$/', '', $content);
+        return trim((string) $content);
+    }
+
+    private static function requested_mode(): string {
+        $mode = self::request_string('mode', 'format');
+        return in_array($mode, ['format', 'translate'], true) ? $mode : 'format';
+    }
+
+    private static function meta_key_for_mode(string $mode): string {
+        return $mode === 'translate' ? self::TRANSLATE_META_KEY : self::FORMAT_META_KEY;
+    }
+
+    private static function request_string(string $key, string $default = ''): string {
+        return sanitize_text_field(wp_unslash($_POST[$key] ?? $default));
+    }
+
+    private static function settings(): array {
+        $data = get_option(self::OPT_KEY, []);
+        return is_array($data) ? $data : [];
+    }
+}
+
+HWS_Desc_Formatter::init();

@@ -1,0 +1,19 @@
+# Секреты
+.env
+
+# WordPress мусор
+wp-content/uploads/
+wp-content/cache/
+wp-content/upgrade/
+wp-content/debug.log
+wp-content/advanced-cache.php
+wp-content/wp-cache-config.php
+
+# OS
+.DS_Store
+wp-content/ai1wm-backups/
+db-backups/wordpress_latest.sql.gz
+
+# Backups — never track
+backups/
+db-backups/

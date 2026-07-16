@@ -1,0 +1,386 @@
+<?php
+/**
+ * Plugin Name: HWS Description Formatter
+ * Description: Форматирует описания товаров через OpenRouter AI.
+ * Version: 1.0.0
+ * Author: HWS
+ */
+
+defined('ABSPATH') || exit;
+
+final class HWS_Desc_Formatter {
+
+    private const META_KEY  = '_hws_desc_formatted';
+    private const OPT_KEY   = 'hws_formatter_settings';
+    private const API_URL   = 'https://openrouter.ai/api/v1/chat/completions';
+
+    private const PROMPT = <<<'PROMPT'
+Ты — редактор текстов для интернет-магазина. Тебе передают описание товара в виде сплошного текста или HTML без структуры.
+
+Задача: отформатируй описание в чистый HTML следующего вида:
+- Раздели текст на логические блоки (2–5 блоков)
+- Каждый блок начинается с <h3>Подзаголовок</h3>
+- За ним следует один или несколько <p>абзацев</p>
+- Не придумывай информацию, только структурируй имеющийся текст
+- Убери лишние переносы строк и артефакты HTML
+- Верни ТОЛЬКО готовый HTML без объяснений и markdown-разметки
+PROMPT;
+
+    public static function init(): void {
+        add_action('admin_menu',              [__CLASS__, 'admin_menu']);
+        add_action('admin_enqueue_scripts',   [__CLASS__, 'admin_assets']);
+        add_action('wp_ajax_hws_fmt_status',  [__CLASS__, 'ajax_status']);
+        add_action('wp_ajax_hws_fmt_next',    [__CLASS__, 'ajax_next']);
+        add_action('wp_ajax_hws_fmt_save_settings', [__CLASS__, 'ajax_save_settings']);
+    }
+
+    public static function admin_menu(): void {
+        add_submenu_page(
+            'woocommerce',
+            'Форматирование описаний',
+            'Форматирование описаний',
+            'manage_woocommerce',
+            'hws-desc-formatter',
+            [__CLASS__, 'render_page']
+        );
+    }
+
+    public static function admin_assets(string $hook): void {
+        if ($hook !== 'woocommerce_page_hws-desc-formatter') return;
+        ?>
+        <style>
+        #hws-fmt-wrap { max-width: 800px; }
+        #hws-fmt-wrap .hws-section { background:#fff; border:1px solid #c3c4c7; border-radius:4px; padding:20px; margin-bottom:20px; }
+        #hws-fmt-wrap h2 { margin-top:0; }
+        #hws-fmt-progress { display:none; margin-top:16px; }
+        .hws-bar-outer { height:20px; background:#f0f0f1; border-radius:10px; overflow:hidden; margin:8px 0; }
+        .hws-bar-inner { height:100%; background:#2271b1; border-radius:10px; transition:width .3s; }
+        #hws-fmt-log { max-height:200px; overflow-y:auto; background:#f6f7f7; border:1px solid #ddd;
+            padding:10px; font-family:monospace; font-size:12px; border-radius:4px; margin-top:12px; }
+        .hws-log-ok  { color:#2a7e2e; }
+        .hws-log-err { color:#b32d2e; }
+        .hws-log-info{ color:#2271b1; }
+        #hws-fmt-controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:16px; }
+        </style>
+        <?php
+    }
+
+    public static function render_page(): void {
+        $settings = self::settings();
+        ?>
+        <div class="wrap" id="hws-fmt-wrap">
+            <h1>Форматирование описаний товаров</h1>
+
+            <div class="hws-section">
+                <h2>Настройки OpenRouter</h2>
+                <table class="form-table" style="max-width:600px">
+                    <tr>
+                        <th>API Key</th>
+                        <td><input type="password" id="hws-api-key" value="<?php echo esc_attr($settings['api_key'] ?? ''); ?>"
+                                   style="width:100%" placeholder="sk-or-..."></td>
+                    </tr>
+                    <tr>
+                        <th>Модель</th>
+                        <td>
+                            <input type="text" id="hws-model"
+                                   value="<?php echo esc_attr($settings['model'] ?? 'meta-llama/llama-3.1-8b-instruct:free'); ?>"
+                                   style="width:100%">
+                            <p class="description">Приоритетная модель. Остальные бесплатные подтянутся автоматически как fallback.</p>
+                        </td>
+                    </tr>
+                </table>
+                <button class="button" id="hws-save-settings">Сохранить настройки</button>
+                <span id="hws-settings-saved" style="display:none;margin-left:10px;color:#2a7e2e">✓ Сохранено</span>
+            </div>
+
+            <div class="hws-section">
+                <h2>Массовое форматирование</h2>
+                <p id="hws-status-text">Загрузка статистики…</p>
+                <div id="hws-fmt-controls">
+                    <button class="button button-primary" id="hws-start-btn" disabled>▶ Форматировать все</button>
+                    <button class="button" id="hws-stop-btn" style="display:none">⏹ Остановить</button>
+                    <button class="button" id="hws-reset-btn" style="display:none">↺ Сбросить все отметки</button>
+                </div>
+                <div id="hws-fmt-progress">
+                    <div class="hws-bar-outer"><div class="hws-bar-inner" id="hws-bar" style="width:0%"></div></div>
+                    <span id="hws-progress-label">0 / 0</span>
+                </div>
+                <div id="hws-fmt-log"></div>
+            </div>
+        </div>
+
+        <script>
+        (function($){
+            var running  = false;
+            var total    = 0;
+            var done     = 0;
+            var nonce    = <?php echo wp_json_encode(wp_create_nonce('hws_formatter')); ?>;
+            var ajaxUrl  = <?php echo wp_json_encode(admin_url('admin-ajax.php')); ?>;
+
+            function log(msg, cls) {
+                var ts = new Date().toLocaleTimeString();
+                $('#hws-fmt-log').append('<div class="hws-log-' + (cls||'info') + '">[' + ts + '] ' + msg + '</div>');
+                var el = document.getElementById('hws-fmt-log');
+                el.scrollTop = el.scrollHeight;
+            }
+
+            function updateBar(d, t) {
+                var pct = t > 0 ? Math.round(d / t * 100) : 0;
+                $('#hws-bar').css('width', pct + '%');
+                $('#hws-progress-label').text(d + ' / ' + t);
+            }
+
+            function loadStatus() {
+                $.post(ajaxUrl, { action: 'hws_fmt_status', _ajax_nonce: nonce }, function(r) {
+                    if (!r.success) return;
+                    total = r.data.total;
+                    done  = r.data.formatted;
+                    var left = total - done;
+                    $('#hws-status-text').html(
+                        'Всего товаров: <strong>' + total + '</strong> · ' +
+                        'Отформатировано: <strong>' + done + '</strong> · ' +
+                        'Осталось: <strong>' + left + '</strong>'
+                    );
+                    $('#hws-start-btn').prop('disabled', left === 0);
+                    if (done > 0) $('#hws-reset-btn').show();
+                    updateBar(done, total);
+                    if (left > 0) $('#hws-fmt-progress').show();
+                });
+            }
+
+            function processNext() {
+                if (!running) return;
+                $.post(ajaxUrl, { action: 'hws_fmt_next', _ajax_nonce: nonce }, function(r) {
+                    if (!r.success) {
+                        log('Ошибка: ' + (r.data || 'неизвестная'), 'err');
+                        running = false;
+                        finishRun();
+                        return;
+                    }
+                    var d = r.data;
+                    if (d.done) {
+                        log('✓ Все товары отформатированы', 'ok');
+                        running = false;
+                        finishRun();
+                        return;
+                    }
+                    done++;
+                    updateBar(done, total);
+                    if (d.skipped) {
+                        log('→ #' + d.id + ' ' + d.title + ' — пропущен (нет описания)', 'info');
+                    } else if (d.error) {
+                        log('✗ #' + d.id + ' ' + d.title + ' — ' + d.error, 'err');
+                    } else {
+                        log('✓ #' + d.id + ' ' + d.title, 'ok');
+                    }
+                    setTimeout(processNext, 300);
+                }).fail(function() {
+                    log('Сетевая ошибка, повтор через 3с…', 'err');
+                    setTimeout(processNext, 3000);
+                });
+            }
+
+            function finishRun() {
+                $('#hws-stop-btn').hide();
+                $('#hws-start-btn').show();
+                loadStatus();
+            }
+
+            $('#hws-start-btn').on('click', function() {
+                running = true;
+                $(this).hide();
+                $('#hws-stop-btn').show();
+                $('#hws-fmt-progress').show();
+                $('#hws-fmt-log').empty();
+                log('Запуск форматирования…');
+                processNext();
+            });
+
+            $('#hws-stop-btn').on('click', function() {
+                running = false;
+                log('Остановлено пользователем', 'info');
+                finishRun();
+            });
+
+            $('#hws-reset-btn').on('click', function() {
+                if (!confirm('Сбросить все отметки? Все товары будут отформатированы заново.')) return;
+                $.post(ajaxUrl, { action: 'hws_fmt_status', reset: 1, _ajax_nonce: nonce }, function() {
+                    log('Отметки сброшены', 'info');
+                    loadStatus();
+                });
+            });
+
+            $('#hws-save-settings').on('click', function() {
+                $.post(ajaxUrl, {
+                    action: 'hws_fmt_save_settings',
+                    api_key: $('#hws-api-key').val(),
+                    model:   $('#hws-model').val(),
+                    _ajax_nonce: nonce
+                }, function(r) {
+                    if (r.success) { $('#hws-settings-saved').fadeIn().delay(2000).fadeOut(); }
+                });
+            });
+
+            loadStatus();
+        })(jQuery);
+        </script>
+        <?php
+    }
+
+    // ─── AJAX ────────────────────────────────────────────────────────────
+
+    public static function ajax_status(): void {
+        check_ajax_referer('hws_formatter');
+        if (!current_user_can('manage_woocommerce')) wp_die('Нет прав.');
+
+        if (!empty($_POST['reset'])) {
+            // Delete all formatted meta
+            global $wpdb;
+            $wpdb->delete($wpdb->postmeta, ['meta_key' => self::META_KEY]);
+        }
+
+        $total     = wp_count_posts('product')->publish;
+        $formatted = (int)(new WP_Query([
+            'post_type'      => 'product',
+            'post_status'    => 'publish',
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+            'meta_query'     => [['key' => self::META_KEY, 'compare' => 'EXISTS']],
+            'no_found_rows'  => false,
+        ]))->found_posts;
+
+        wp_send_json_success(['total' => (int)$total, 'formatted' => $formatted]);
+    }
+
+    public static function ajax_next(): void {
+        check_ajax_referer('hws_formatter');
+        if (!current_user_can('manage_woocommerce')) wp_die('Нет прав.');
+
+        // Get next unformatted product
+        $query = new WP_Query([
+            'post_type'      => 'product',
+            'post_status'    => 'publish',
+            'posts_per_page' => 1,
+            'fields'         => 'ids',
+            'orderby'        => 'ID',
+            'order'          => 'ASC',
+            'meta_query'     => [[
+                'key'     => self::META_KEY,
+                'compare' => 'NOT EXISTS',
+            ]],
+        ]);
+
+        if (empty($query->posts)) {
+            wp_send_json_success(['done' => true]);
+        }
+
+        $product_id = (int)$query->posts[0];
+        $post       = get_post($product_id);
+        $title      = $post->post_title;
+        $raw        = $post->post_content;
+
+        // Mark even if empty to skip next time
+        if (empty(trim(wp_strip_all_tags($raw)))) {
+            update_post_meta($product_id, self::META_KEY, '1');
+            wp_send_json_success(['done' => false, 'id' => $product_id, 'title' => $title, 'skipped' => true]);
+        }
+
+        $settings = self::settings();
+        $api_key  = $settings['api_key'] ?? '';
+        $model    = $settings['model']   ?? 'meta-llama/llama-3.1-8b-instruct:free';
+
+        if (!$api_key) {
+            wp_send_json_error('API ключ не задан');
+        }
+
+        $formatted = self::call_openrouter($raw, $api_key, $model);
+
+        if (is_wp_error($formatted)) {
+            // Mark as error so we skip it (not loop forever); reset button clears these
+            update_post_meta($product_id, self::META_KEY, 'error');
+            wp_send_json_success([
+                'done'  => false,
+                'id'    => $product_id,
+                'title' => $title,
+                'error' => $formatted->get_error_message(),
+            ]);
+        }
+
+        // Save formatted description
+        wp_update_post(['ID' => $product_id, 'post_content' => $formatted]);
+        update_post_meta($product_id, self::META_KEY, '1');
+
+        wp_send_json_success(['done' => false, 'id' => $product_id, 'title' => $title]);
+    }
+
+    public static function ajax_save_settings(): void {
+        check_ajax_referer('hws_formatter');
+        if (!current_user_can('manage_woocommerce')) wp_die('Нет прав.');
+        update_option(self::OPT_KEY, [
+            'api_key' => sanitize_text_field(wp_unslash($_POST['api_key'] ?? '')),
+            'model'   => sanitize_text_field(wp_unslash($_POST['model']   ?? '')),
+        ]);
+        wp_send_json_success();
+    }
+
+    // ─── OpenRouter API ───────────────────────────────────────────────────
+
+    private static function call_openrouter(string $raw_html, string $api_key, string $model): string|\WP_Error {
+        $text = wp_strip_all_tags($raw_html);
+        $text = preg_replace('/\s{3,}/', "\n\n", trim($text));
+
+        if (mb_strlen($text) < 30) {
+            return new \WP_Error('too_short', 'Слишком короткий текст');
+        }
+
+        $response = wp_remote_post(self::API_URL, [
+            'timeout' => 60,
+            'headers' => [
+                'Authorization' => 'Bearer ' . $api_key,
+                'Content-Type'  => 'application/json',
+                'HTTP-Referer'  => get_site_url(),
+                'X-Title'       => get_bloginfo('name'),
+            ],
+            'body' => wp_json_encode([
+                'model'      => $model,
+                'max_tokens' => 2000,
+                'messages'   => [
+                    ['role' => 'system', 'content' => self::PROMPT],
+                    ['role' => 'user',   'content' => $text],
+                ],
+            ]),
+        ]);
+
+        if (is_wp_error($response)) {
+            return $response;
+        }
+
+        $code = wp_remote_retrieve_response_code($response);
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+
+        if ($code !== 200) {
+            $msg = $body['error']['message'] ?? "HTTP {$code}";
+            return new \WP_Error('api_error', $msg);
+        }
+
+        $content = $body['choices'][0]['message']['content'] ?? '';
+        if (!$content) {
+            return new \WP_Error('empty_response', 'Пустой ответ от модели');
+        }
+
+        // Strip markdown code fences if model returned them
+        $content = preg_replace('/^```(?:html)?\s*/i', '', trim($content));
+        $content = preg_replace('/\s*```$/', '', $content);
+
+        return trim($content);
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────
+
+    private static function settings(): array {
+        $data = get_option(self::OPT_KEY, []);
+        return is_array($data) ? $data : [];
+    }
+}
+
+HWS_Desc_Formatter::init();

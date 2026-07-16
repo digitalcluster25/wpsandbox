@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HWS — Премиальные бани, сауны и хаммамы под ключ</title>
+  <meta name="description" content="Подбор оборудования, поставка, монтаж и запуск в Узбекистане и Азербайджане. Официальный дистрибьютор EasySteam и Sangens.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Castoro:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"Organization","name":"Home Wood Spa","alternateName":"HWS","url":"https://wpsandbox.spaces.community","telephone":"+998781137788","address":{"@type":"PostalAddress","addressLocality":"Ташкент","addressCountry":"UZ"}}
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Ohio Design Tokens ── */
+    :root {
+      --c-topbar-bg:   #DEE3AD;
+      --c-topbar-txt:  #1C1A14;
+      --c-header-bg:   #25221B;
+      --c-accent:      #8B7D5C;
+      --c-accent-dark: #5E593B;
+      --c-white:       #ffffff;
+      --c-nav:         rgba(255,255,255,0.85);
+      --c-label:       rgba(255,255,255,0.52);
+      --c-sub:         rgba(255,255,255,0.72);
+      --c-trust-ico:   rgba(255,255,255,0.70);
+      --c-trust-txt:   rgba(255,255,255,0.70);
+      --c-trust-sep:   rgba(255,255,255,0.15);
+      --c-trust-ico-border: rgba(255,255,255,0.30);
+
+      --f-serif: 'Castoro', Georgia, serif;
+      --f-sans:  'DM Sans', system-ui, sans-serif;
+
+      --h1-size: clamp(44px, 4.5vw, 72px);
+      --h1-ls:   -0.045em;
+
+      --container: 1344px;
+      --px: clamp(24px, calc((100vw - 1344px) / 2 + 40px), 160px);
+
+      --btn-h:    3rem;
+      --btn-px:   1.75rem;
+      --btn-r:    6px;
+      --btn-fw:   400;
+      --btn-fz:   15px;
+
+      --ease:     cubic-bezier(0.645, 0.045, 0.355, 1);
+      --dur:      0.35s;
+      --dur-fast: 0.2s;
+    }
+
+    html, body { height: 100%; }
+    body {
+      font-family: var(--f-sans);
+      background: #0a0908;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* ══════════════════════════════
+       TOP BAR
+    ══════════════════════════════ */
+    .topbar {
+      background: var(--c-topbar-bg);
+      width: 100%;
+      padding: 9px var(--px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .topbar__text {
+      font-family: var(--f-sans);
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--c-topbar-txt);
+      letter-spacing: 0.005em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .topbar__text strong {
+      font-weight: 600;
+    }
+    .topbar__sep {
+      display: inline-block;
+      margin: 0 10px;
+      opacity: 0.5;
+    }
+
+    /* ══════════════════════════════
+       HEADER
+    ══════════════════════════════ */
+    .hdr {
+      background: var(--c-header-bg);
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 var(--px);
+      height: 76px;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 10;
+    }
+
+    /* Logo */
+    .hdr__logo {
+      text-decoration: none;
+      color: var(--c-white);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      flex-shrink: 0;
+    }
+    .hdr__logo-hws {
+      font-family: var(--f-serif);
+      font-size: 26px;
+      font-weight: 400;
+      letter-spacing: 0.06em;
+      line-height: 1;
+      color: var(--c-white);
+    }
+    .hdr__logo-sub {
+      font-family: var(--f-sans);
+      font-size: 8px;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.38);
+      line-height: 1;
+    }
+
+    /* Nav — centered absolute */
+    .hdr__nav {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    .hdr__nav a {
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--c-nav);
+      text-decoration: none;
+      letter-spacing: 0.01em;
+      transition: color var(--dur-fast) var(--ease);
+      white-space: nowrap;
+    }
+    .hdr__nav a:hover { color: var(--c-white); }
+
+    /* Right side */
+    .hdr__right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    /* Phone */
+    .hdr__phone {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--c-nav);
+      text-decoration: none;
+      transition: color var(--dur-fast) var(--ease);
+      white-space: nowrap;
+      letter-spacing: 0.01em;
+    }
+    .hdr__phone:hover { color: var(--c-white); }
+    .hdr__phone svg { opacity: 0.6; flex-shrink: 0; }
+
+    /* Header CTA button */
+    .btn-hdr {
+      display: inline-flex;
+      align-items: center;
+      height: 2.5rem;
+      padding: 0 1.1rem;
+      font-family: var(--f-sans);
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--c-white);
+      border: 1px solid rgba(255,255,255,0.38);
+      border-radius: 4px;
+      text-decoration: none;
+      white-space: nowrap;
+      letter-spacing: 0.01em;
+      transition: border-color var(--dur-fast) var(--ease);
+    }
+    .btn-hdr:hover { border-color: rgba(255,255,255,0.70); }
+
+    /* ══════════════════════════════
+       HERO
+    ══════════════════════════════ */
+    .hero {
+      position: relative;
+      width: 100%;
+      /* Viewport minus topbar (~37px) minus header (76px) */
+      min-height: calc(100svh - 113px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* BG photo */
+    .hero__bg {
+      position: absolute;
+      inset: 0;
+      background-image: url('https://wpsandbox.spaces.community/wp-content/uploads/2026/06/ChatGPT-Image-1-%D0%B8%D1%8E%D0%BD.-2026-%D0%B3.-23_39_43.webp');
+      background-size: cover;
+      /* Shift right to show stone wall on right side */
+      background-position: 60% center;
+      background-repeat: no-repeat;
+    }
+
+    /* Gradient — dark left, fade right */
+    .hero__bg::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg,
+          rgba(5,4,3,0.94) 0%,
+          rgba(5,4,3,0.80) 28%,
+          rgba(5,4,3,0.38) 52%,
+          rgba(5,4,3,0.05) 70%
+        ),
+        linear-gradient(180deg,
+          rgba(5,4,3,0.0)  0%,
+          rgba(5,4,3,0.0)  65%,
+          rgba(5,4,3,0.45) 100%
+        );
+    }
+
+    /* Content area */
+    .hero__body {
+      position: relative;
+      z-index: 5;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 0 var(--px) 48px;
+      width: 100%;
+    }
+
+    .hero__inner { max-width: 580px; }
+
+    /* Label */
+    .hero__label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--f-sans);
+      font-size: 11px;
+      font-weight: 400;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      color: var(--c-label);
+      margin-bottom: 20px;
+    }
+    .hero__label::after {
+      content: '';
+      display: block;
+      width: 26px;
+      height: 1px;
+      background: var(--c-label);
+      flex-shrink: 0;
+    }
+
+    /* H1 */
+    .hero__h1 {
+      font-family: var(--f-serif);
+      font-weight: 400;
+      font-size: var(--h1-size);
+      line-height: 1.0;
+      letter-spacing: var(--h1-ls);
+      color: var(--c-white);
+      margin-bottom: 22px;
+    }
+    .hero__h1 .wide { word-spacing: 0.20em; }
+
+    /* Subheading */
+    .hero__sub {
+      font-family: var(--f-sans);
+      font-size: clamp(15px, 1.35vw, 18px);
+      font-weight: 300;
+      line-height: 1.55;
+      color: var(--c-sub);
+      margin-bottom: 38px;
+    }
+
+    /* CTA buttons */
+    .hero__cta {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    /* Filled button — exactly #8B7D5C from tokens */
+    .btn-filled {
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      height: var(--btn-h);
+      padding: 0 var(--btn-px);
+      font-family: var(--f-sans);
+      font-size: var(--btn-fz);
+      font-weight: var(--btn-fw);
+      letter-spacing: 0.01em;
+      color: var(--c-white);
+      background: var(--c-accent);
+      border: 1.5px solid var(--c-accent);
+      border-radius: var(--btn-r);
+      text-decoration: none;
+      transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+      white-space: nowrap;
+      min-width: 260px;
+    }
+    .btn-filled:hover { background: #7A6C4E; border-color: #7A6C4E; }
+
+    /* Outline button */
+    .btn-outline {
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      height: var(--btn-h);
+      padding: 0 var(--btn-px);
+      font-family: var(--f-sans);
+      font-size: var(--btn-fz);
+      font-weight: var(--btn-fw);
+      letter-spacing: 0.01em;
+      color: var(--c-white);
+      background: rgba(255,255,255,0.08);
+      border: 1.5px solid rgba(255,255,255,0.40);
+      border-radius: var(--btn-r);
+      text-decoration: none;
+      transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+      white-space: nowrap;
+      min-width: 220px;
+    }
+    .btn-outline:hover { border-color: rgba(255,255,255,0.70); background: rgba(255,255,255,0.12); }
+
+    .btn-arrow {
+      font-size: 18px;
+      line-height: 1;
+      opacity: 0.8;
+      flex-shrink: 0;
+    }
+
+    /* ══════════════════════════════
+       TRUST BAR
+    ══════════════════════════════ */
+    .trust {
+      position: relative;
+      z-index: 5;
+      border-top: 1px solid var(--c-trust-sep);
+      flex-shrink: 0;
+    }
+
+    .trust__inner {
+      padding: 0 var(--px);
+      display: flex;
+      align-items: stretch;
+    }
+
+    .trust__item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 32px 20px 0;
+      flex: 1;
+      border-right: 1px solid var(--c-trust-sep);
+    }
+    .trust__item:first-child { padding-left: 0; }
+    .trust__item:last-child  { border-right: none; padding-right: 0; }
+
+    /* Icon WITH circle border — as seen in reference */
+    .trust__icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--c-trust-ico-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: var(--c-trust-ico);
+    }
+
+    .trust__text {
+      font-family: var(--f-sans);
+      font-size: 12.5px;
+      font-weight: 400;
+      line-height: 1.38;
+      color: var(--c-trust-txt);
+    }
+
+    /* ══════════════════════════════
+       RESPONSIVE
+    ══════════════════════════════ */
+    @media (max-width: 1100px) {
+      .hdr__nav { display: none; }
+    }
+    @media (max-width: 768px) {
+      .hdr__phone span { display: none; }
+      .topbar__text { font-size: 11px; }
+      .trust__inner {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+      .trust__item {
+        border-right: none;
+        border-bottom: 1px solid var(--c-trust-sep);
+        padding: 14px 8px;
+      }
+      .trust__item:nth-child(odd)  { border-right: 1px solid var(--c-trust-sep); }
+      .trust__item:nth-last-child(-n+2) { border-bottom: none; }
+    }
+    @media (max-width: 480px) {
+      .hero__cta .btn-filled,
+      .hero__cta .btn-outline {
+        width: 100%;
+        min-width: unset;
+        justify-content: space-between;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP BAR -->
+  <div class="topbar" role="banner">
+    <p class="topbar__text">
+      <strong>Игорь Костин</strong>&nbsp;&nbsp;консультирует лично
+      <span class="topbar__sep">—</span>
+      17 лет строительства SPA и бань в Узбекистане и Азербайджане
+    </p>
+  </div>
+
+  <!-- HEADER -->
+  <header class="hdr">
+    <a href="/" class="hdr__logo" aria-label="HWS Home Wood Spa">
+      <span class="hdr__logo-hws">HWS</span>
+      <span class="hdr__logo-sub">Home Wood Spa</span>
+    </a>
+
+    <nav class="hdr__nav" aria-label="Основная навигация">
+      <a href="/shop/">Каталог</a>
+      <a href="/projects/">Проекты</a>
+      <a href="/services/">Услуги</a>
+      <a href="/brands/">Бренды</a>
+      <a href="/knowledge-base/">База знаний</a>
+      <a href="/about/">О компании</a>
+      <a href="/contact-us/">Контакты</a>
+    </nav>
+
+    <div class="hdr__right">
+      <a href="tel:+998781137788" class="hdr__phone">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.0 1.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92z"/>
+        </svg>
+        <span>+998 78 113 77 88</span>
+      </a>
+      <a href="/contact-us/" class="btn-hdr">Получить расчёт мощности</a>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero" aria-label="Главный экран">
+
+    <div class="hero__bg" role="img" aria-label="Интерьер премиальной бани — проект HWS"></div>
+
+    <div class="hero__body">
+      <div class="hero__inner">
+
+        <p class="hero__label">Премиальные решения для бань, саун и SPA</p>
+
+        <h1 class="hero__h1">
+          Премиальные бани,<br>
+          сауны и хаммамы<br>
+          <span class="wide">под ключ</span>
+        </h1>
+
+        <p class="hero__sub">
+          Подбор оборудования, поставка, монтаж<br>
+          и запуск в Узбекистане и Азербайджане
+        </p>
+
+        <div class="hero__cta">
+          <a href="/contact-us/" class="btn-filled">
+            Получить расчёт мощности
+            <span class="btn-arrow">›</span>
+          </a>
+          <a href="https://homewoodspa.com" class="btn-outline" target="_blank" rel="noopener">
+            Смотреть проекты
+            <span class="btn-arrow">›</span>
+          </a>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- TRUST BAR -->
+    <div class="trust">
+      <div class="trust__inner">
+
+        <div class="trust__item">
+          <div class="trust__icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <span class="trust__text">Официальные<br>поставки</span>
+        </div>
+
+        <div class="trust__item">
+          <div class="trust__icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+          </div>
+          <span class="trust__text">Премиальные<br>бренды</span>
+        </div>
+
+        <div class="trust__item">
+          <div class="trust__icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+            </svg>
+          </div>
+          <span class="trust__text">Проектирование<br>и подбор</span>
+        </div>
+
+        <div class="trust__item">
+          <div class="trust__icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+            </svg>
+          </div>
+          <span class="trust__text">Монтаж<br>и запуск</span>
+        </div>
+
+        <div class="trust__item">
+          <div class="trust__icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+            </svg>
+          </div>
+          <span class="trust__text">Гарантия<br>и сервис</span>
+        </div>
+
+      </div>
+    </div>
+
+  </section>
+
+</body>
+</html>
