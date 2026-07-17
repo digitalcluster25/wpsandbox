@@ -13,8 +13,6 @@ final class HWS_Desc_Formatter {
     private const FORMAT_META_KEY = '_hws_desc_formatted';
     private const TRANSLATE_META_KEY = '_hws_desc_translated';
     private const TRANSLATE_REPORT_META_KEY = '_hws_desc_translate_report';
-    private const CATEGORY_META_KEY = '_hws_category_checked';
-    private const CATEGORY_REPORT_META_KEY = '_hws_category_report';
     private const OPT_KEY = 'hws_formatter_settings';
     private const LOG_OPT_KEY = 'hws_formatter_activity_log';
     private const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -144,9 +142,6 @@ PROMPT;
         add_action('wp_ajax_hws_fmt_completed', [__CLASS__, 'ajax_completed']);
         add_action('wp_ajax_hws_fmt_logs', [__CLASS__, 'ajax_logs']);
         add_action('wp_ajax_hws_fmt_save_settings', [__CLASS__, 'ajax_save_settings']);
-        add_action('wp_ajax_hws_fmt_category_status', [__CLASS__, 'ajax_category_status']);
-        add_action('wp_ajax_hws_fmt_category_next', [__CLASS__, 'ajax_category_next']);
-        add_action('wp_ajax_hws_fmt_category_reset', [__CLASS__, 'ajax_category_reset']);
     }
 
     // Admin UI
@@ -441,32 +436,6 @@ PROMPT;
                             <span id="hws-format-progress-label">0 / 0</span>
                         </div>
                         <div class="hws-log" id="hws-format-log"></div>
-                    </div>
-
-                    <div class="hws-section">
-                        <h2>Распределение товаров по категориям</h2>
-                        <p class="hws-subtitle">Модель анализирует карточку и текущую категорию. Правильные категории сохраняются, ошибочные заменяются на подходящую категорию. Если нужной дочерней категории нет, она создаётся в утверждённом дереве каталога.</p>
-                        <div class="hws-chip-row">
-                            <div class="hws-chip">Текущая категория</div>
-                            <div class="hws-chip">Название и описание</div>
-                            <div class="hws-chip">Бренд и атрибуты</div>
-                            <div class="hws-chip">Создание отсутствующей категории</div>
-                        </div>
-                        <div class="hws-kpi" id="hws-category-kpi">
-                            <div class="hws-kpi-card"><strong id="hws-category-total">0</strong><span>Всего</span></div>
-                            <div class="hws-kpi-card"><strong id="hws-category-done">0</strong><span>Проверено</span></div>
-                            <div class="hws-kpi-card"><strong id="hws-category-left">0</strong><span>Осталось</span></div>
-                        </div>
-                        <div class="hws-controls">
-                            <button class="button button-primary" id="hws-category-start-btn">▶ Распределить товары</button>
-                            <button class="button" id="hws-category-stop-btn" style="display:none">⏹ Остановить</button>
-                            <button class="button" id="hws-category-reset-btn">↺ Проверить заново</button>
-                        </div>
-                        <div class="hws-progress" id="hws-category-progress">
-                            <div class="hws-bar-outer"><div class="hws-bar-inner" id="hws-category-bar" style="width:0%"></div></div>
-                            <span id="hws-category-progress-label">0 / 0</span>
-                        </div>
-                        <div class="hws-log" id="hws-category-log"></div>
                     </div>
 
                     <div class="hws-section">
@@ -845,9 +814,6 @@ PROMPT;
                                 } else {
                                     $(config.startBtn).prop('disabled', true);
                                 }
-                                // Сканер пересобрал очередь и снял устаревшие
-                                // отметки. Обновляем KPI до запуска перевода.
-                                loadStatus();
                                 loadCompleted();
                             } else {
                                 log('Ошибка сканирования: ' + (r.data || 'неизвестная'), 'err');
@@ -934,99 +900,6 @@ PROMPT;
                 });
             });
 
-            (function(){
-                var running = false;
-                var total = 0;
-                var done = 0;
-
-                function log(msg, cls) {
-                    var ts = new Date().toLocaleTimeString();
-                    $('#hws-category-log').append('<div class="hws-log-' + (cls || 'info') + '">[' + ts + '] ' + escapeHtml(msg) + '</div>');
-                    var el = document.querySelector('#hws-category-log');
-                    el.scrollTop = el.scrollHeight;
-                    persistActivity('category', msg, cls || 'info');
-                }
-
-                function update(){
-                    var left = Math.max(total - done, 0);
-                    $('#hws-category-total').text(total);
-                    $('#hws-category-done').text(done);
-                    $('#hws-category-left').text(left);
-                    $('#hws-category-bar').css('width', (total ? Math.round(done / total * 100) : 0) + '%');
-                    $('#hws-category-progress-label').text(done + ' / ' + total);
-                }
-
-                function loadStatus(){
-                    $.post(ajaxUrl, { action:'hws_fmt_category_status', _ajax_nonce:nonce }, function(r){
-                        if (r.success) {
-                            total = parseInt(r.data.total, 10) || 0;
-                            done = parseInt(r.data.processed, 10) || 0;
-                            update();
-                        }
-                    });
-                }
-
-                function next(){
-                    if (!running) return;
-                    $.post(ajaxUrl, { action:'hws_fmt_category_next', _ajax_nonce:nonce }, function(r){
-                        if (!r.success) {
-                            log('Ошибка: ' + (r.data || 'неизвестная ошибка'), 'err');
-                            running = false;
-                            $('#hws-category-stop-btn').hide();
-                            $('#hws-category-start-btn').show();
-                            return;
-                        }
-                        if (r.data.done) {
-                            log('Распределение категорий завершено', 'ok');
-                            running = false;
-                            $('#hws-category-stop-btn').hide();
-                            $('#hws-category-start-btn').show();
-                            loadStatus();
-                            return;
-                        }
-                        done++;
-                        update();
-                        log('#' + r.data.id + ' ' + r.data.title + ' — ' + r.data.message, r.data.changed ? 'ok' : 'info');
-                        setTimeout(next, 250);
-                    }).fail(function(){
-                        log('Сетевая ошибка, повтор через 3 секунды…', 'err');
-                        setTimeout(next, 3000);
-                    });
-                }
-
-                $('#hws-category-start-btn').on('click', function(){
-                    if (total === 0 || done >= total) {
-                        loadStatus();
-                    }
-                    running = true;
-                    $('#hws-category-start-btn').hide();
-                    $('#hws-category-stop-btn').show();
-                    $('#hws-category-progress').show();
-                    log('Запуск проверки категорий…', 'info');
-                    next();
-                });
-
-                $('#hws-category-stop-btn').on('click', function(){
-                    running = false;
-                    $('#hws-category-stop-btn').hide();
-                    $('#hws-category-start-btn').show();
-                    log('Остановлено пользователем', 'info');
-                });
-
-                $('#hws-category-reset-btn').on('click', function(){
-                    if (!confirm('Сбросить отметки проверки категорий и запустить проверку заново?')) return;
-                    $.post(ajaxUrl, { action:'hws_fmt_category_reset', _ajax_nonce:nonce }, function(r){
-                        if (r.success) {
-                            done = 0;
-                            log('Отметки проверки категорий сброшены', 'info');
-                            loadStatus();
-                        }
-                    });
-                });
-
-                loadStatus();
-            })();
-
             var formatRunner = createRunner('format', {
                 startBtn: '#hws-format-start-btn',
                 stopBtn: '#hws-format-stop-btn',
@@ -1074,83 +947,6 @@ PROMPT;
     }
 
     // AJAX handlers
-
-    public static function ajax_category_status(): void {
-        check_ajax_referer('hws_formatter');
-        self::assert_permissions();
-
-        $total = (int) (new WP_Query(self::category_product_query_args(false)))->found_posts;
-        $processed = (int) (new WP_Query(self::category_product_query_args(true)))->found_posts;
-
-        wp_send_json_success([
-            'total' => $total,
-            'processed' => $processed,
-        ]);
-    }
-
-    public static function ajax_category_reset(): void {
-        check_ajax_referer('hws_formatter');
-        self::assert_permissions();
-
-        global $wpdb;
-        $wpdb->delete($wpdb->postmeta, ['meta_key' => self::CATEGORY_META_KEY]);
-        $wpdb->delete($wpdb->postmeta, ['meta_key' => self::CATEGORY_REPORT_META_KEY]);
-        wp_send_json_success();
-    }
-
-    public static function ajax_category_next(): void {
-        check_ajax_referer('hws_formatter');
-        self::assert_permissions();
-
-        $settings = self::settings();
-        $api_key = (string) ($settings['api_key'] ?? '');
-        $model = (string) ($settings['model'] ?? 'meta-llama/llama-3.1-8b-instruct:free');
-        if ($api_key === '') {
-            wp_send_json_error('API ключ не задан');
-        }
-
-        $query = new WP_Query(self::category_product_query_args(false, 1));
-        if (empty($query->posts)) {
-            wp_send_json_success(['done' => true]);
-        }
-
-        $product_id = (int) $query->posts[0];
-        $post = get_post($product_id);
-        $product = wc_get_product($product_id);
-        if (!$post instanceof WP_Post || !$product) {
-            update_post_meta($product_id, self::CATEGORY_META_KEY, 'error');
-            wp_send_json_success([
-                'done' => false,
-                'id' => $product_id,
-                'title' => 'unknown',
-                'changed' => false,
-                'message' => 'товар не найден',
-            ]);
-        }
-
-        $result = self::classify_and_apply_category($post, $product, $api_key, $model);
-        if (is_wp_error($result)) {
-            update_post_meta($product_id, self::CATEGORY_META_KEY, 'error');
-            wp_send_json_success([
-                'done' => false,
-                'id' => $product_id,
-                'title' => $post->post_title,
-                'changed' => false,
-                'message' => 'ошибка: ' . $result->get_error_message(),
-            ]);
-        }
-
-        update_post_meta($product_id, self::CATEGORY_META_KEY, '1');
-        update_post_meta($product_id, self::CATEGORY_REPORT_META_KEY, $result);
-
-        wp_send_json_success([
-            'done' => false,
-            'id' => $product_id,
-            'title' => $post->post_title,
-            'changed' => !empty($result['changed']),
-            'message' => (string) ($result['message'] ?? 'проверено'),
-        ]);
-    }
 
     public static function ajax_status(): void {
         check_ajax_referer('hws_formatter');
@@ -1241,12 +1037,7 @@ PROMPT;
         }
 
         $brand_id = self::request_int('brand_id');
-        // Сканирование должно проверять актуальное содержимое, а не старую
-        // отметку перевода. Отметка не содержит языковую пару и могла быть
-        // записана предыдущим запуском для другого перевода.
-        $query = new WP_Query(self::product_query_args($mode, '', $brand_id, null));
-        $from_code = self::request_string('from_lang', self::settings()['translate_from'] ?? 'ru');
-        $to_code = self::request_string('to_lang', self::settings()['translate_to'] ?? 'en');
+        $query = new WP_Query(self::product_query_args($mode, self::TRANSLATE_META_KEY, $brand_id, false));
         $items = [];
         $summary = [
             'title' => 0,
@@ -1263,18 +1054,10 @@ PROMPT;
                 continue;
             }
 
-            $scan = self::scan_product_translation($post, $product, $from_code);
+            $scan = self::scan_product_translation($post, $product);
             if (empty($scan['parts'])) {
-                // Синхронизируем очередь: товар без исходных текстов больше
-                // не должен блокировать завершение текущей языковой пары.
-                update_post_meta((int) $product_id, self::TRANSLATE_META_KEY, '1');
                 continue;
             }
-
-            // Если содержимое снова требует перевода, снимаем устаревшую
-            // отметку, чтобы ajax_next обработал этот товар.
-            delete_post_meta((int) $product_id, self::TRANSLATE_META_KEY);
-            delete_post_meta((int) $product_id, self::TRANSLATE_REPORT_META_KEY);
 
             foreach ($scan['counts'] as $key => $value) {
                 $summary[$key] += $value;
@@ -1328,7 +1111,7 @@ PROMPT;
                 continue;
             }
 
-            $scan = self::scan_product_translation($post, $product, self::request_string('from_lang', self::settings()['translate_from'] ?? 'ru'));
+            $scan = self::scan_product_translation($post, $product);
             $items[] = [
                 'id' => (int) $product_id,
                 'title' => $post->post_title,
@@ -1416,7 +1199,7 @@ PROMPT;
         ];
 
         $product = wc_get_product($post->ID);
-        $scan = $product ? self::scan_product_translation($post, $product, $from_code) : ['parts' => []];
+        $scan = $product ? self::scan_product_translation($post, $product) : ['parts' => []];
         $blueprint = $product ? self::build_attributes_blueprint($post->ID, $product) : ['attributes' => []];
         $scope = self::translation_scope_details($product_payload, $blueprint, $product);
         $details[] = 'Проверка: ' . $scope['check'];
@@ -1498,7 +1281,7 @@ PROMPT;
         return ['message' => 'атрибуты и вариации обновлены (' . $scope['attributes'] . ')'];
     }
 
-    private static function scan_product_translation(WP_Post $post, WC_Product $product, string $from_code = 'ru'): array {
+    private static function scan_product_translation(WP_Post $post, WC_Product $product): array {
         $parts = [];
         $counts = [
             'title' => 0,
@@ -1573,25 +1356,6 @@ PROMPT;
                 'parts' => $parts,
             ],
         ];
-    }
-
-    private static function text_needs_translation(string $text, string $from_code): bool {
-        $text = trim(wp_strip_all_tags($text));
-        if ($text === '') {
-            return false;
-        }
-
-        // Для языков, которые текущий лёгкий детектор не различает,
-        // оставляем прежнее безопасное поведение: проверяем любое значение.
-        $detected = self::detect_text_language($text);
-        if ($from_code === 'ru') {
-            return in_array($detected, ['Russian', 'mixed'], true);
-        }
-        if ($from_code === 'en') {
-            return in_array($detected, ['English/Latin', 'mixed'], true);
-        }
-
-        return true;
     }
 
     private static function detect_text_language(string $text): string {
@@ -1831,145 +1595,6 @@ PROMPT;
 
     // OpenRouter
 
-    private const CATEGORY_PROMPT = <<<'PROMPT'
-Ты — классификатор товаров для каталога оборудования для бань, саун и хаммамов.
-
-Определи одну основную категорию товара. Если текущая категория подходит по назначению товара, верни action "keep". Если не подходит, верни action "move" и выбери путь только из allowed_categories. Никогда не помещай аксессуар, пульт, дымоход, бак или теплообменник в категорию печей или парогенераторов. Бренд не является категорией.
-
-Верни только JSON:
-{
-  "action": "keep" или "move",
-  "path": ["slug", "child-slug"],
-  "confidence": 0.0,
-  "reason": "краткая причина"
-}
-Для низкой уверенности ниже 0.75 используй action "keep" и не меняй товар.
-PROMPT;
-
-    private static function classify_and_apply_category(WP_Post $post, WC_Product $product, string $api_key, string $model): array|\WP_Error {
-        $current = self::product_category_path($product->get_id());
-        $text = trim(wp_strip_all_tags((string) $post->post_title . "\n" . (string) $post->post_excerpt . "\n" . (string) $post->post_content));
-        $hint = self::category_hint($text);
-
-        if ($hint !== null) {
-            $suggestion = ['action' => 'move', 'path' => $hint, 'confidence' => 0.96];
-        } else {
-            $attributes = [];
-            foreach ($product->get_attributes() as $attribute) {
-                $values = $attribute->is_taxonomy()
-                    ? wc_get_product_terms($product->get_id(), $attribute->get_name(), ['fields' => 'names'])
-                    : $attribute->get_options();
-                $attributes[] = [
-                    'name' => wc_attribute_label($attribute->get_name(), $product),
-                    'values' => array_values(array_map('strval', (array) $values)),
-                ];
-            }
-            $suggestion = self::call_json_openrouter(self::CATEGORY_PROMPT, [
-                'title' => (string) $post->post_title,
-                'excerpt' => (string) $post->post_excerpt,
-                'content' => mb_substr($text, 0, 5000),
-                'brand' => self::product_brand_name($product->get_id()),
-                'attributes' => $attributes,
-                'current_category' => $current,
-                'allowed_categories' => self::category_blueprint(),
-            ], $api_key, $model, 1200);
-            if (is_wp_error($suggestion)) {
-                return $suggestion;
-            }
-        }
-
-        $path = array_values(array_filter(array_map('sanitize_title', (array) ($suggestion['path'] ?? []))));
-        $allowed = array_map(static fn(array $item): string => implode('/', $item['path']), self::category_blueprint());
-        if ($path === [] || !in_array(implode('/', $path), $allowed, true)) {
-            return ['changed' => false, 'message' => 'оставлено: категория не прошла проверку', 'current' => $current, 'suggested' => $path];
-        }
-
-        $confidence = (float) ($suggestion['confidence'] ?? 0);
-        $target = implode('/', $path);
-        if (($suggestion['action'] ?? '') === 'keep' || $confidence < 0.75 || $target === implode('/', $current)) {
-            return ['changed' => false, 'message' => 'категория оставлена: ' . ($current ? implode(' / ', $current) : 'не определена'), 'current' => $current, 'suggested' => $path, 'confidence' => $confidence];
-        }
-
-        $term_ids = self::ensure_category_path($path);
-        if (is_wp_error($term_ids)) {
-            return $term_ids;
-        }
-        $set = wp_set_object_terms($product->get_id(), $term_ids, 'product_cat', false);
-        if (is_wp_error($set)) {
-            return $set;
-        }
-
-        return ['changed' => true, 'message' => 'перемещён в ' . implode(' / ', $path), 'current' => $current, 'suggested' => $path, 'confidence' => $confidence];
-    }
-
-    private static function category_hint(string $text): ?array {
-        $text = mb_strtolower($text);
-        if (preg_match('/steam outlet|essence holder|aroma|арома|аромат|дозатор аром|вывод пара|подач[аи] пара/u', $text)) {
-            return ['accessories', 'aroma-and-steam'];
-        }
-        if (preg_match('/control unit|control panel|пульт управления|автоматик/u', $text)) {
-            return ['control-units'];
-        }
-        if (preg_match('/chimney|дымоход|flue/u', $text)) {
-            return ['chimneys-and-installation', 'chimneys'];
-        }
-        if (preg_match('/heat exchanger|теплообменник/u', $text)) {
-            return ['water-tanks-and-heat-exchangers', 'heat-exchangers'];
-        }
-        if (preg_match('/water tank|бак для воды/u', $text)) {
-            return ['water-tanks-and-heat-exchangers', 'water-tanks'];
-        }
-        return null;
-    }
-
-    private static function product_category_path(int $product_id): array {
-        $terms = wp_get_post_terms($product_id, 'product_cat');
-        if (is_wp_error($terms) || empty($terms)) {
-            return [];
-        }
-        usort($terms, static fn(WP_Term $a, WP_Term $b): int => count(get_ancestors($b->term_id, 'product_cat', 'taxonomy')) <=> count(get_ancestors($a->term_id, 'product_cat', 'taxonomy')));
-        $term = $terms[0];
-        $ids = array_reverse(get_ancestors($term->term_id, 'product_cat', 'taxonomy'));
-        $ids[] = (int) $term->term_id;
-        $path = [];
-        foreach ($ids as $id) {
-            $ancestor = get_term($id, 'product_cat');
-            if ($ancestor && !is_wp_error($ancestor)) {
-                $path[] = (string) $ancestor->slug;
-            }
-        }
-        return $path;
-    }
-
-    private static function ensure_category_path(array $path): array|\WP_Error {
-        $parent = 0;
-        $ids = [];
-        foreach ($path as $slug) {
-            $terms = get_terms(['taxonomy' => 'product_cat', 'slug' => $slug, 'parent' => $parent, 'hide_empty' => false, 'number' => 1]);
-            if (!is_wp_error($terms) && !empty($terms[0])) {
-                $term_id = (int) $terms[0]->term_id;
-            } else {
-                $inserted = wp_insert_term(self::category_label($slug), 'product_cat', ['slug' => $slug, 'parent' => $parent]);
-                if (is_wp_error($inserted)) {
-                    return $inserted;
-                }
-                $term_id = (int) $inserted['term_id'];
-            }
-            $ids[] = $term_id;
-            $parent = $term_id;
-        }
-        return $ids;
-    }
-
-    private static function product_brand_name(int $product_id): string {
-        $taxonomy = self::brand_taxonomy();
-        if ($taxonomy === '') {
-            return '';
-        }
-        $terms = wp_get_post_terms($product_id, $taxonomy, ['fields' => 'names']);
-        return is_wp_error($terms) ? '' : implode(', ', array_map('strval', (array) $terms));
-    }
-
     private static function call_format_openrouter(string $raw_html, string $api_key, string $model): string|\WP_Error {
         $text = wp_strip_all_tags($raw_html);
         $text = preg_replace('/\s{3,}/', "\n\n", trim($text));
@@ -2145,74 +1770,6 @@ PROMPT;
     }
 
     // Data helpers
-
-    private static function category_product_query_args(bool $processed, int $posts_per_page = -1): array {
-        return [
-            'post_type' => 'product',
-            'post_status' => 'publish',
-            'posts_per_page' => $posts_per_page,
-            'fields' => 'ids',
-            'orderby' => 'ID',
-            'order' => 'ASC',
-            'no_found_rows' => false,
-            'meta_query' => [[
-                'key' => self::CATEGORY_META_KEY,
-                'compare' => $processed ? 'EXISTS' : 'NOT EXISTS',
-            ]],
-        ];
-    }
-
-    private static function category_blueprint(): array {
-        return [
-            ['path' => ['russian-bath-stoves'], 'label' => 'Печи для русской бани'],
-            ['path' => ['russian-bath-stoves', 'electric'], 'label' => 'Электрические печи'],
-            ['path' => ['russian-bath-stoves', 'wood'], 'label' => 'Дровяные печи'],
-            ['path' => ['russian-bath-stoves', 'gas'], 'label' => 'Газовые печи'],
-            ['path' => ['russian-bath-stoves', 'steam-thermal'], 'label' => 'Паротермальные печи'],
-            ['path' => ['sauna-stoves'], 'label' => 'Печи для сауны'],
-            ['path' => ['sauna-stoves', 'electric'], 'label' => 'Электрические печи для сауны'],
-            ['path' => ['sauna-stoves', 'gas'], 'label' => 'Газовые печи для сауны'],
-            ['path' => ['sauna-stoves', 'commercial'], 'label' => 'Коммерческие печи для сауны'],
-            ['path' => ['steam-generators-and-hammam'], 'label' => 'Парогенераторы и хаммам'],
-            ['path' => ['steam-generators-and-hammam', 'steam-generators'], 'label' => 'Парогенераторы'],
-            ['path' => ['steam-generators-and-hammam', 'steam-room-equipment'], 'label' => 'Оборудование для паровых комнат'],
-            ['path' => ['steam-generators-and-hammam', 'control-systems'], 'label' => 'Системы управления паром'],
-            ['path' => ['commercial'], 'label' => 'Коммерческие решения'],
-            ['path' => ['commercial', 'commercial-bath-stoves'], 'label' => 'Коммерческие печи для бани'],
-            ['path' => ['commercial', 'commercial-sauna-heaters'], 'label' => 'Коммерческие нагреватели для сауны'],
-            ['path' => ['commercial', 'steam-generators'], 'label' => 'Коммерческие парогенераторы'],
-            ['path' => ['commercial', 'spa-systems'], 'label' => 'SPA-системы'],
-            ['path' => ['control-units'], 'label' => 'Пульты и автоматика'],
-            ['path' => ['control-units', 'for-sauna-heaters'], 'label' => 'Пульты для печей сауны'],
-            ['path' => ['control-units', 'for-steam-generators'], 'label' => 'Пульты для парогенераторов'],
-            ['path' => ['chimneys-and-installation'], 'label' => 'Дымоходы и монтаж'],
-            ['path' => ['chimneys-and-installation', 'chimneys'], 'label' => 'Дымоходы'],
-            ['path' => ['chimneys-and-installation', 'mounting-elements'], 'label' => 'Монтажные элементы'],
-            ['path' => ['chimneys-and-installation', 'gas-burners'], 'label' => 'Газовые горелки'],
-            ['path' => ['water-tanks-and-heat-exchangers'], 'label' => 'Баки и теплообменники'],
-            ['path' => ['water-tanks-and-heat-exchangers', 'water-tanks'], 'label' => 'Баки для воды'],
-            ['path' => ['water-tanks-and-heat-exchangers', 'heat-exchangers'], 'label' => 'Теплообменники'],
-            ['path' => ['stones-and-cladding'], 'label' => 'Камни и облицовка'],
-            ['path' => ['stones-and-cladding', 'heater-stones'], 'label' => 'Камни для печей'],
-            ['path' => ['stones-and-cladding', 'cladding'], 'label' => 'Облицовка'],
-            ['path' => ['stones-and-cladding', 'decor'], 'label' => 'Декор'],
-            ['path' => ['accessories'], 'label' => 'Аксессуары'],
-            ['path' => ['accessories', 'bathing-accessories'], 'label' => 'Банные аксессуары'],
-            ['path' => ['accessories', 'pouring-devices'], 'label' => 'Обливные устройства'],
-            ['path' => ['accessories', 'aroma-and-steam'], 'label' => 'Арома и пар'],
-            ['path' => ['accessories', 'wood-storage'], 'label' => 'Хранение дров'],
-        ];
-    }
-
-    private static function category_label(string $slug): string {
-        foreach (self::category_blueprint() as $item) {
-            $path = $item['path'];
-            if ((string) end($path) === $slug) {
-                return (string) $item['label'];
-            }
-        }
-        return ucwords(str_replace('-', ' ', $slug));
-    }
 
     private static function product_query_args(string $mode, string $meta_key = '', int $brand_id = 0, ?bool $processed = null, int $posts_per_page = -1): array {
         $args = [
