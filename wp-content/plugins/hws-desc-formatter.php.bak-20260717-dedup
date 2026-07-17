@@ -2,7 +2,7 @@
 /**
  * Plugin Name: HWS Description Formatter
  * Description: Форматирует и переводит тексты товаров, атрибуты и вариации через OpenRouter AI.
- * Version: 1.2.12
+ * Version: 1.2.11
  * Author: HWS
  */
 
@@ -2002,31 +2002,11 @@ PROMPT;
         $parent = 0;
         $ids = [];
         foreach ($path as $slug) {
-            $label = self::category_label($slug);
             $terms = get_terms(['taxonomy' => 'product_cat', 'slug' => $slug, 'parent' => $parent, 'hide_empty' => false, 'number' => 1]);
             if (!is_wp_error($terms) && !empty($terms[0])) {
                 $term_id = (int) $terms[0]->term_id;
             } else {
-                // WordPress may suffix a slug when an earlier duplicate already exists.
-                // Match the approved name and parent before creating another term.
-                $siblings = get_terms(['taxonomy' => 'product_cat', 'parent' => $parent, 'hide_empty' => false, 'orderby' => 'term_id', 'order' => 'ASC']);
-                $term_id = 0;
-                if (!is_wp_error($siblings)) {
-                    $normalized_label = mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', wp_strip_all_tags($label))));
-                    foreach ($siblings as $sibling) {
-                        $normalized_name = mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', wp_strip_all_tags($sibling->name))));
-                        if ($normalized_name === $normalized_label) {
-                            $term_id = (int) $sibling->term_id;
-                            break;
-                        }
-                    }
-                }
-                if ($term_id > 0) {
-                    $ids[] = $term_id;
-                    $parent = $term_id;
-                    continue;
-                }
-                $inserted = wp_insert_term($label, 'product_cat', ['slug' => $slug, 'parent' => $parent]);
+                $inserted = wp_insert_term(self::category_label($slug), 'product_cat', ['slug' => $slug, 'parent' => $parent]);
                 if (is_wp_error($inserted)) {
                     return $inserted;
                 }
