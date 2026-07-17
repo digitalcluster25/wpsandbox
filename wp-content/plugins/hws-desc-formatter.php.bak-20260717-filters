@@ -2,7 +2,7 @@
 /**
  * Plugin Name: HWS Description Formatter
  * Description: Форматирует и переводит тексты товаров, атрибуты и вариации через OpenRouter AI.
- * Version: 1.2.11
+ * Version: 1.2.10
  * Author: HWS
  */
 
@@ -451,20 +451,6 @@ PROMPT;
                             <div class="hws-chip">Название и описание</div>
                             <div class="hws-chip">Бренд и атрибуты</div>
                             <div class="hws-chip">Создание отсутствующей категории</div>
-                        </div>
-                        <div class="hws-settings-grid hws-category-filters">
-                            <div class="hws-field">
-                                <label for="hws-category-brand">Бренд</label>
-                                <?php self::render_category_brand_select(); ?>
-                            </div>
-                            <div class="hws-field">
-                                <label for="hws-category-parent">Категория</label>
-                                <?php self::render_category_parent_select(); ?>
-                            </div>
-                            <div class="hws-field">
-                                <label for="hws-category-child">Подкатегория</label>
-                                <?php self::render_category_child_select(); ?>
-                            </div>
                         </div>
                         <div class="hws-kpi" id="hws-category-kpi">
                             <div class="hws-kpi-card"><strong id="hws-category-total">0</strong><span>Всего</span></div>
@@ -953,20 +939,6 @@ PROMPT;
                 var total = 0;
                 var done = 0;
 
-                function categoryPayload(action) {
-                    return {
-                        action: action,
-                        _ajax_nonce: nonce,
-                        brand: parseInt($('#hws-category-brand').val(), 10) || 0,
-                        category: parseInt($('#hws-category-parent').val(), 10) || 0,
-                        subcategory: parseInt($('#hws-category-child').val(), 10) || 0
-                    };
-                }
-
-                function setCategoryFiltersDisabled(disabled) {
-                    $('.hws-category-filters select').prop('disabled', disabled);
-                }
-
                 function log(msg, cls) {
                     var ts = new Date().toLocaleTimeString();
                     $('#hws-category-log').append('<div class="hws-log-' + (cls || 'info') + '">[' + ts + '] ' + escapeHtml(msg) + '</div>');
@@ -984,25 +956,24 @@ PROMPT;
                     $('#hws-category-progress-label').text(done + ' / ' + total);
                 }
 
-                function loadStatus(callback){
-                    $.post(ajaxUrl, categoryPayload('hws_fmt_category_status'), function(r){
+                function loadStatus(){
+                    $.post(ajaxUrl, { action:'hws_fmt_category_status', _ajax_nonce:nonce }, function(r){
                         if (r.success) {
                             total = parseInt(r.data.total, 10) || 0;
                             done = parseInt(r.data.processed, 10) || 0;
                             update();
                         }
-                    }).always(function(){ if (typeof callback === 'function') callback(); });
+                    });
                 }
 
                 function next(){
                     if (!running) return;
-                    $.post(ajaxUrl, categoryPayload('hws_fmt_category_next'), function(r){
+                    $.post(ajaxUrl, { action:'hws_fmt_category_next', _ajax_nonce:nonce }, function(r){
                         if (!r.success) {
                             log('Ошибка: ' + (r.data || 'неизвестная ошибка'), 'err');
                             running = false;
                             $('#hws-category-stop-btn').hide();
                             $('#hws-category-start-btn').show();
-                            setCategoryFiltersDisabled(false);
                             return;
                         }
                         if (r.data.done) {
@@ -1010,7 +981,6 @@ PROMPT;
                             running = false;
                             $('#hws-category-stop-btn').hide();
                             $('#hws-category-start-btn').show();
-                            setCategoryFiltersDisabled(false);
                             loadStatus();
                             return;
                         }
@@ -1025,55 +995,33 @@ PROMPT;
                 }
 
                 $('#hws-category-start-btn').on('click', function(){
-                    loadStatus(function(){
-                        if (total === 0 || done >= total) {
-                            log('В выбранном диапазоне нет товаров для обработки', 'info');
-                            return;
-                        }
-                        running = true;
-                        setCategoryFiltersDisabled(true);
-                        $('#hws-category-start-btn').hide();
-                        $('#hws-category-stop-btn').show();
-                        $('#hws-category-progress').show();
-                        log('Запуск проверки категорий…', 'info');
-                        next();
-                    });
+                    if (total === 0 || done >= total) {
+                        loadStatus();
+                    }
+                    running = true;
+                    $('#hws-category-start-btn').hide();
+                    $('#hws-category-stop-btn').show();
+                    $('#hws-category-progress').show();
+                    log('Запуск проверки категорий…', 'info');
+                    next();
                 });
 
                 $('#hws-category-stop-btn').on('click', function(){
                     running = false;
                     $('#hws-category-stop-btn').hide();
                     $('#hws-category-start-btn').show();
-                    setCategoryFiltersDisabled(false);
                     log('Остановлено пользователем', 'info');
                 });
 
                 $('#hws-category-reset-btn').on('click', function(){
                     if (!confirm('Сбросить отметки проверки категорий и запустить проверку заново?')) return;
-                    $.post(ajaxUrl, categoryPayload('hws_fmt_category_reset'), function(r){
+                    $.post(ajaxUrl, { action:'hws_fmt_category_reset', _ajax_nonce:nonce }, function(r){
                         if (r.success) {
                             done = 0;
                             log('Отметки проверки категорий сброшены', 'info');
                             loadStatus();
                         }
                     });
-                });
-
-                $('#hws-category-parent').on('change', function(){
-                    var parentId = String($(this).val() || '');
-                    var child = $('#hws-category-child');
-                    child.val('');
-                    child.find('option[data-parent]').each(function(){
-                        $(this).toggle(!parentId || String($(this).data('parent')) === parentId);
-                    });
-                    child.prop('disabled', !parentId);
-                    done = 0;
-                    loadStatus();
-                });
-
-                $('#hws-category-brand, #hws-category-child').on('change', function(){
-                    done = 0;
-                    loadStatus();
                 });
 
                 loadStatus();
@@ -1131,9 +1079,8 @@ PROMPT;
         check_ajax_referer('hws_formatter');
         self::assert_permissions();
 
-        $filters = self::category_filters_from_request();
-        $total = (int) (new WP_Query(self::category_product_query_args(false, -1, $filters)))->found_posts;
-        $processed = (int) (new WP_Query(self::category_product_query_args(true, -1, $filters)))->found_posts;
+        $total = (int) (new WP_Query(self::category_product_query_args(false)))->found_posts;
+        $processed = (int) (new WP_Query(self::category_product_query_args(true)))->found_posts;
 
         wp_send_json_success([
             'total' => $total,
@@ -1145,12 +1092,9 @@ PROMPT;
         check_ajax_referer('hws_formatter');
         self::assert_permissions();
 
-        $filters = self::category_filters_from_request();
-        $ids = (new WP_Query(self::category_product_query_args(true, -1, $filters)))->posts;
-        foreach ($ids as $product_id) {
-            delete_post_meta((int) $product_id, self::CATEGORY_META_KEY);
-            delete_post_meta((int) $product_id, self::CATEGORY_REPORT_META_KEY);
-        }
+        global $wpdb;
+        $wpdb->delete($wpdb->postmeta, ['meta_key' => self::CATEGORY_META_KEY]);
+        $wpdb->delete($wpdb->postmeta, ['meta_key' => self::CATEGORY_REPORT_META_KEY]);
         wp_send_json_success();
     }
 
@@ -1165,8 +1109,7 @@ PROMPT;
             wp_send_json_error('API ключ не задан');
         }
 
-        $filters = self::category_filters_from_request();
-        $query = new WP_Query(self::category_product_query_args(false, 1, $filters));
+        $query = new WP_Query(self::category_product_query_args(false, 1));
         if (empty($query->posts)) {
             wp_send_json_success(['done' => true]);
         }
@@ -2201,55 +2144,10 @@ PROMPT;
         echo '</select>';
     }
 
-    private static function render_category_brand_select(): void {
-        self::render_taxonomy_select('hws-category-brand', self::brand_taxonomy(), 'Все бренды');
-    }
-
-    private static function render_category_parent_select(): void {
-        echo '<select id="hws-category-parent">';
-        echo '<option value="0">Все категории</option>';
-        $terms = get_terms(['taxonomy' => 'product_cat', 'hide_empty' => false, 'parent' => 0, 'orderby' => 'name', 'order' => 'ASC']);
-        if (!is_wp_error($terms)) {
-            foreach ($terms as $term) {
-                printf('<option value="%d">%s</option>', (int) $term->term_id, esc_html($term->name));
-            }
-        }
-        echo '</select>';
-    }
-
-    private static function render_category_child_select(): void {
-        echo '<select id="hws-category-child" disabled>';
-        echo '<option value="0">Все подкатегории</option>';
-        $terms = get_terms(['taxonomy' => 'product_cat', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
-        if (!is_wp_error($terms)) {
-            foreach ($terms as $term) {
-                if ((int) $term->parent <= 0) {
-                    continue;
-                }
-                printf('<option value="%d" data-parent="%d">%s</option>', (int) $term->term_id, (int) $term->parent, esc_html($term->name));
-            }
-        }
-        echo '</select>';
-    }
-
-    private static function render_taxonomy_select(string $id, string $taxonomy, string $empty_label): void {
-        echo '<select id="' . esc_attr($id) . '">';
-        echo '<option value="0">' . esc_html($empty_label) . '</option>';
-        if ($taxonomy !== '') {
-            $terms = get_terms(['taxonomy' => $taxonomy, 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
-            if (!is_wp_error($terms)) {
-                foreach ($terms as $term) {
-                    printf('<option value="%d">%s</option>', (int) $term->term_id, esc_html($term->name));
-                }
-            }
-        }
-        echo '</select>';
-    }
-
     // Data helpers
 
-    private static function category_product_query_args(bool $processed, int $posts_per_page = -1, array $filters = []): array {
-        $args = [
+    private static function category_product_query_args(bool $processed, int $posts_per_page = -1): array {
+        return [
             'post_type' => 'product',
             'post_status' => 'publish',
             'posts_per_page' => $posts_per_page,
@@ -2262,47 +2160,6 @@ PROMPT;
                 'compare' => $processed ? 'EXISTS' : 'NOT EXISTS',
             ]],
         ];
-
-        $tax_query = [];
-        $brand = (int) ($filters['brand'] ?? 0);
-        $category = (int) ($filters['category'] ?? 0);
-        $subcategory = (int) ($filters['subcategory'] ?? 0);
-        $brand_taxonomy = self::brand_taxonomy();
-        if ($brand > 0 && $brand_taxonomy !== '') {
-            $tax_query[] = ['taxonomy' => $brand_taxonomy, 'field' => 'term_id', 'terms' => [$brand], 'include_children' => false];
-        }
-        if ($subcategory > 0) {
-            $tax_query[] = ['taxonomy' => 'product_cat', 'field' => 'term_id', 'terms' => [$subcategory], 'include_children' => false];
-        } elseif ($category > 0) {
-            $tax_query[] = ['taxonomy' => 'product_cat', 'field' => 'term_id', 'terms' => [$category], 'include_children' => true];
-        }
-        if ($tax_query) {
-            $args['tax_query'] = array_merge(['relation' => 'AND'], $tax_query);
-        }
-        return $args;
-    }
-
-    private static function category_filters_from_request(): array {
-        $brand = isset($_POST['brand']) ? absint(wp_unslash($_POST['brand'])) : 0;
-        $category = isset($_POST['category']) ? absint(wp_unslash($_POST['category'])) : 0;
-        $subcategory = isset($_POST['subcategory']) ? absint(wp_unslash($_POST['subcategory'])) : 0;
-        $brand_taxonomy = self::brand_taxonomy();
-        if ($brand > 0 && ($brand_taxonomy === '' || !term_exists($brand, $brand_taxonomy))) {
-            $brand = 0;
-        }
-        if ($category > 0) {
-            $term = get_term($category, 'product_cat');
-            if (!$term || is_wp_error($term) || (int) $term->parent !== 0) {
-                $category = 0;
-            }
-        }
-        if ($subcategory > 0) {
-            $term = get_term($subcategory, 'product_cat');
-            if (!$term || is_wp_error($term) || ($category > 0 && (int) $term->parent !== $category)) {
-                $subcategory = 0;
-            }
-        }
-        return ['brand' => $brand, 'category' => $category, 'subcategory' => $subcategory];
     }
 
     private static function category_blueprint(): array {
