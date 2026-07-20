@@ -2,7 +2,7 @@
 /**
  * Plugin Name: HWS Content Control
  * Description: Управление текстами и надписями на фронтенде.
- * Version: 1.3.0
+ * Version: 1.2.0
  */
 
 defined('ABSPATH') || exit;
@@ -12,51 +12,6 @@ final class HWS_Content_Control {
     private const OPTION = 'hws_site_texts';
 
     private const DEFAULTS = [
-        // Карусель проектов на главной
-        'home_cases_enabled'       => true,
-        'home_cases_title'         => 'Реализованные проекты',
-        'home_cases_slides'        => [
-            [
-                'id' => 1,
-                'image' => 'https://colabrio.ams3.cdn.digitaloceanspaces.com/ohio-stage-demo-19/oh__demo19__08.webp',
-                'title' => 'Частная резиденция',
-                'href' => '#',
-                'location' => 'Ташкент, Узбекистан',
-                'meta' => ['area' => '14 м²', 'type' => 'Русская баня', 'tech' => 'печь · Kastor'],
-            ],
-            [
-                'id' => 2,
-                'image' => 'https://colabrio.ams3.cdn.digitaloceanspaces.com/ohio-stage-demo-19/oh__demo19__09.webp',
-                'title' => 'SPA комплекс отеля',
-                'href' => '#',
-                'location' => 'Баку, Азербайджан',
-                'meta' => ['area' => '120 м²', 'type' => 'SPA-зона', 'tech' => 'пар · EOS'],
-            ],
-            [
-                'id' => 3,
-                'image' => 'https://colabrio.ams3.cdn.digitaloceanspaces.com/ohio-stage-demo-19/oh__demo19__14-1024x648.webp',
-                'title' => 'Загородный дом',
-                'href' => '#',
-                'location' => 'Ташкентская область',
-                'meta' => ['area' => '9 м²', 'type' => 'Финская сауна', 'tech' => 'печь · Harvia'],
-            ],
-            [
-                'id' => 4,
-                'image' => '/assets/herobg.png',
-                'title' => 'Частный SPA',
-                'href' => '#',
-                'location' => 'Баку, Азербайджан',
-                'meta' => ['area' => '26 м²', 'type' => 'Хаммам', 'tech' => 'пар · EasySteam'],
-            ],
-            [
-                'id' => 5,
-                'image' => 'https://colabrio.ams3.cdn.digitaloceanspaces.com/ohio-stage-demo-19/oh__demo19__14.webp',
-                'title' => 'Вилла у бассейна',
-                'href' => '#',
-                'location' => 'Самарканд, Узбекистан',
-                'meta' => ['area' => '18 м²', 'type' => 'Сауна', 'tech' => 'печь · HUUM'],
-            ],
-        ],
         // Главная
         'home_categories_title'     => 'Решения для любых задач',
         'home_products_title'       => 'Подобранная коллекция',
@@ -150,7 +105,6 @@ final class HWS_Content_Control {
         if (!is_array($texts)) $texts = [];
 
         foreach (array_keys(self::DEFAULTS) as $key) {
-            if ($key === 'home_cases_enabled' || $key === 'home_cases_slides') continue;
             $val = sanitize_textarea_field(wp_unslash($_POST[$key] ?? ''));
             if ($val !== '') {
                 $texts[$key] = $val;
@@ -158,11 +112,6 @@ final class HWS_Content_Control {
                 unset($texts[$key]); // empty = revert to default
             }
         }
-
-        $texts['home_cases_enabled'] = !empty($_POST['home_cases_enabled']);
-        $cases_title = sanitize_text_field(wp_unslash($_POST['home_cases_title'] ?? ''));
-        $texts['home_cases_title'] = $cases_title !== '' ? $cases_title : self::DEFAULTS['home_cases_title'];
-        $texts['home_cases_slides'] = self::sanitize_slides($_POST['home_cases_slides'] ?? []);
 
         update_option(self::OPTION, $texts, false);
         if (function_exists('hws_revalidate')) hws_revalidate();
@@ -239,128 +188,10 @@ final class HWS_Content_Control {
                 </table>
                 <?php endforeach; ?>
 
-                <?php
-                $cases_enabled = array_key_exists('home_cases_enabled', $texts)
-                    ? (bool) $texts['home_cases_enabled']
-                    : self::DEFAULTS['home_cases_enabled'];
-                $cases_title = $texts['home_cases_title'] ?? self::DEFAULTS['home_cases_title'];
-                $cases_slides = self::get_cases_slides($texts);
-                ?>
-                <h2 style="margin-top:28px;border-bottom:1px solid #ddd;padding-bottom:6px">Карусель проектов на главной</h2>
-                <table class="form-table" style="margin-top:8px">
-                    <tr>
-                        <th style="width:30%;vertical-align:top;padding-top:14px"><label for="home_cases_title"><strong>Заголовок блока</strong></label></th>
-                        <td><input type="text" id="home_cases_title" name="home_cases_title" class="large-text" value="<?php echo esc_attr($cases_title); ?>"></td>
-                    </tr>
-                    <tr>
-                        <th style="vertical-align:top;padding-top:14px"><strong>Видимость блока</strong></th>
-                        <td><label><input type="checkbox" name="home_cases_enabled" value="1" <?php checked($cases_enabled); ?>> Показывать карусель на главной</label></td>
-                    </tr>
-                </table>
-                <div id="hws-cases-slides">
-                    <?php foreach ($cases_slides as $index => $slide): ?>
-                    <?php self::render_slide($index, $slide); ?>
-                    <?php endforeach; ?>
-                </div>
-                <p><button type="button" class="button" id="hws-add-case-slide">Добавить слайд</button></p>
-
                 <div style="margin-top:24px"><?php submit_button('Сохранить', 'primary', 'submit', false); ?></div>
             </form>
         </div>
-        <script>
-        (() => {
-            const list = document.getElementById('hws-cases-slides');
-            const add = document.getElementById('hws-add-case-slide');
-            if (!list || !add) return;
-            let index = list.querySelectorAll('.hws-case-slide').length;
-            add.addEventListener('click', () => {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'hws-case-slide';
-                wrapper.style = 'border:1px solid #ccd0d4;padding:16px;margin:16px 0;background:#fff;max-width:800px';
-                const template = <?php echo wp_json_encode(self::slide_template()); ?>;
-                wrapper.innerHTML = template.replaceAll('__INDEX__', index++);
-                list.appendChild(wrapper);
-            });
-            list.addEventListener('click', (event) => {
-                if (event.target instanceof HTMLElement && event.target.matches('.hws-remove-case-slide')) {
-                    event.target.closest('.hws-case-slide')?.remove();
-                }
-            });
-        })();
-        </script>
         <?php
-    }
-
-    private static function render_slide(int $index, array $slide): void {
-        $slide = self::normalize_slide($slide, $index + 1);
-        echo '<div class="hws-case-slide" style="border:1px solid #ccd0d4;padding:16px;margin:16px 0;background:#fff;max-width:800px">';
-        echo '<h3 style="margin-top:0">Слайд ' . esc_html($index + 1) . '</h3>';
-        echo self::slide_template($index, $slide);
-        echo '</div>';
-    }
-
-    private static function slide_template(?int $index = null, array $slide = []): string {
-        $index_value = $index === null ? '__INDEX__' : (string) $index;
-        $slide = self::normalize_slide($slide, 0);
-        $fields = [
-            'image' => 'Изображение (URL)',
-            'title' => 'Заголовок',
-            'href' => 'Ссылка',
-            'location' => 'Локация',
-            'area' => 'Площадь',
-            'type' => 'Тип',
-            'tech' => 'Технология',
-        ];
-        $html = '<div class="hws-case-fields">';
-        foreach ($fields as $field => $label) {
-            $value = $slide[$field] ?? ($slide['meta'][$field] ?? '');
-            $name = 'home_cases_slides[' . $index_value . '][' . $field . ']';
-            $html .= '<p><label><strong>' . esc_html($label) . '</strong><br><input type="text" class="large-text" name="' . esc_attr($name) . '" value="' . esc_attr($value) . '"></label></p>';
-        }
-        $html .= '<button type="button" class="button hws-remove-case-slide">Удалить слайд</button></div>';
-        return $html;
-    }
-
-    private static function normalize_slide(array $slide, int $fallback_id): array {
-        return [
-            'id' => (int) ($slide['id'] ?? $fallback_id),
-            'image' => (string) ($slide['image'] ?? ''),
-            'title' => (string) ($slide['title'] ?? ''),
-            'href' => (string) ($slide['href'] ?? '#'),
-            'location' => (string) ($slide['location'] ?? ''),
-            'meta' => [
-                'area' => (string) ($slide['meta']['area'] ?? $slide['area'] ?? ''),
-                'type' => (string) ($slide['meta']['type'] ?? $slide['type'] ?? ''),
-                'tech' => (string) ($slide['meta']['tech'] ?? $slide['tech'] ?? ''),
-            ],
-        ];
-    }
-
-    private static function sanitize_slides($slides): array {
-        if (!is_array($slides)) return [];
-        $result = [];
-        foreach (array_values($slides) as $index => $slide) {
-            if (!is_array($slide)) continue;
-            $normalized = self::normalize_slide($slide, $index + 1);
-            $result[] = [
-                'id' => $normalized['id'] > 0 ? $normalized['id'] : $index + 1,
-                'image' => esc_url_raw($normalized['image']),
-                'title' => sanitize_text_field($normalized['title']),
-                'href' => esc_url_raw($normalized['href']) ?: '#',
-                'location' => sanitize_text_field($normalized['location']),
-                'meta' => [
-                    'area' => sanitize_text_field($normalized['meta']['area']),
-                    'type' => sanitize_text_field($normalized['meta']['type']),
-                    'tech' => sanitize_text_field($normalized['meta']['tech']),
-                ],
-            ];
-        }
-        return $result;
-    }
-
-    private static function get_cases_slides(array $texts): array {
-        $slides = $texts['home_cases_slides'] ?? self::DEFAULTS['home_cases_slides'];
-        return is_array($slides) ? array_map(static fn ($slide, $index) => self::normalize_slide((array) $slide, $index + 1), $slides, array_keys($slides)) : [];
     }
 
     public static function get_texts(): array {
@@ -379,24 +210,6 @@ final class HWS_Content_Control {
             ],
         ]);
 
-        register_graphql_object_type('HwsCaseMeta', [
-            'fields' => [
-                'area' => ['type' => 'String'],
-                'type' => ['type' => 'String'],
-                'tech' => ['type' => 'String'],
-            ],
-        ]);
-        register_graphql_object_type('HwsCaseSlide', [
-            'fields' => [
-                'id' => ['type' => 'Int'],
-                'image' => ['type' => 'String'],
-                'title' => ['type' => 'String'],
-                'href' => ['type' => 'String'],
-                'location' => ['type' => 'String'],
-                'meta' => ['type' => 'HwsCaseMeta'],
-            ],
-        ]);
-
         register_graphql_object_type('HwsSiteTexts', [
             'description' => 'Редактируемые тексты фронтенда',
             'fields'      => [
@@ -411,9 +224,6 @@ final class HWS_Content_Control {
                 'brandCategoriesTitle'    => ['type' => 'String'],
                 'knowledgePageTitle'      => ['type' => 'String'],
                 'productDescriptionTitle' => ['type' => 'String'],
-                'homeCasesEnabled'       => ['type' => 'Boolean'],
-                'homeCasesTitle'         => ['type' => 'String'],
-                'homeCasesSlides'        => ['type' => ['list_of' => 'HwsCaseSlide']],
             ],
         ]);
 
@@ -440,9 +250,6 @@ final class HWS_Content_Control {
                     'brandCategoriesTitle'    => $t['brand_categories_title'],
                     'knowledgePageTitle'      => $t['knowledge_page_title'],
                     'productDescriptionTitle' => $t['product_description_title'],
-                    'homeCasesEnabled' => (bool) ($t['home_cases_enabled'] ?? true),
-                    'homeCasesTitle' => $t['home_cases_title'] ?? self::DEFAULTS['home_cases_title'],
-                    'homeCasesSlides' => self::get_cases_slides($t),
                 ];
             },
         ]);
