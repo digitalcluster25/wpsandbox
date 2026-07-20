@@ -323,7 +323,7 @@ final class HWS_Image_Background_Remover {
 		}
 
 		$temp = trailingslashit( dirname( $source ) ) . '.hws-ibr-' . $attachment_id . '-' . wp_generate_password( 10, false, false ) . '.png';
-		$command = 'NUMBA_DISABLE_JIT=1 U2NET_HOME=/opt/hws-rembg/models timeout 240s ' . escapeshellarg( $binary ) . ' i ' . escapeshellarg( $source ) . ' ' . escapeshellarg( $temp );
+		$command = 'U2NET_HOME=/opt/hws-rembg/models timeout 240s ' . escapeshellarg( $binary ) . ' i ' . escapeshellarg( $source ) . ' ' . escapeshellarg( $temp );
 		$output  = [];
 		$code    = 0;
 		exec( $command . ' 2>&1', $output, $code );
@@ -343,7 +343,6 @@ final class HWS_Image_Background_Remover {
 		$relative_file = ( $relative_dir ? trailingslashit( $relative_dir ) : '' ) . wp_basename( $target );
 		update_attached_file( $attachment_id, $relative_file );
 		wp_update_post( [ 'ID' => $attachment_id, 'post_mime_type' => 'image/png' ] );
-		require_once ABSPATH . 'wp-admin/includes/image.php';
 		$metadata = wp_generate_attachment_metadata( $attachment_id, $target );
 		if ( is_array( $metadata ) ) {
 			wp_update_attachment_metadata( $attachment_id, $metadata );
