@@ -431,11 +431,10 @@ add_action(
 						return [];
 					}
 
-					$rate = (float) get_post_meta( $product_id, '_hws_usd_rub_rate', true );
 					$raw = get_post_meta( $product_id, '_hws_source_payload', true );
 					$payload = json_decode( $raw, true );
-					if ( $rate > 0 && is_array( $payload ) && ! empty( $payload['option_groups'] ) && is_array( $payload['option_groups'] ) ) {
-						return hws_graphql_bridge_map_variant_groups( $payload['option_groups'], $rate );
+					if ( is_array( $payload ) && ! empty( $payload['option_groups'] ) && is_array( $payload['option_groups'] ) ) {
+						return hws_graphql_bridge_map_variant_groups( $payload['option_groups'], 1.0 );
 					}
 
 					return hws_graphql_bridge_get_wc_variant_groups( $product_id );
@@ -566,10 +565,11 @@ add_action(
 
 /**
  * @param array<int, array{id?: mixed, name?: string, values?: array<int, array{name?: string, delta_price?: float, is_default?: bool, sort_order?: int}>}> $groups
- * @param float $rate USD/RUB курс — delta_price (RUB) / rate = priceModifier (USD)
+ * @param float $rate unused legacy argument
  * @return array<int, array{key: string, label: string, options: array<int, array{value: string, slug: string, priceModifier: float}>}>
  */
 function hws_graphql_bridge_map_variant_groups( array $groups, float $rate ): array {
+	unset( $rate );
 	$result = [];
 
 	foreach ( $groups as $group ) {
@@ -601,7 +601,7 @@ function hws_graphql_bridge_map_variant_groups( array $groups, float $rate ): ar
 			$options[]      = [
 				'value'         => $value['name'],
 				'slug'          => hws_graphql_bridge_slugify( (string) $value['name'] ),
-				'priceModifier' => round( $delta_rub / $rate ),
+				'priceModifier' => $delta_rub,
 			];
 		}
 
