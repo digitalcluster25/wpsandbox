@@ -149,6 +149,64 @@ add_action(
 			]
 		);
 
+		register_graphql_field(
+			'Product',
+			'hwsPriceCurrency',
+			[
+				'type'        => 'String',
+				'description' => __( 'Код базовой валюты хранения цены товара', 'hws-graphql-bridge' ),
+				'resolve'     => function ( $source ) {
+					$product_id = hws_graphql_bridge_get_product_id( $source );
+					if ( empty( $product_id ) ) {
+						return null;
+					}
+
+					$currency = get_post_meta( $product_id, '_hws_price_currency', true );
+					if ( ! $currency ) {
+						$currency = get_woocommerce_currency();
+					}
+
+					return $currency ?: null;
+				},
+			]
+		);
+
+		register_graphql_field(
+			'Product',
+			'hwsSourceImageUrl',
+			[
+				'type'        => 'String',
+				'description' => __( 'Резервный URL исходного изображения товара, если attachment ещё не привязан', 'hws-graphql-bridge' ),
+				'resolve'     => function ( $source ) {
+					$product_id = hws_graphql_bridge_get_product_id( $source );
+					if ( empty( $product_id ) ) {
+						return null;
+					}
+
+					$url = get_post_meta( $product_id, '_hws_source_base_image', true );
+					return $url ?: null;
+				},
+			]
+		);
+
+		register_graphql_field(
+			'ProductVariation',
+			'hwsSourceImageUrl',
+			[
+				'type'        => 'String',
+				'description' => __( 'Резервный URL исходного изображения вариации, если attachment ещё не привязан', 'hws-graphql-bridge' ),
+				'resolve'     => function ( $source ) {
+					$variation_id = $source->databaseId ?? $source->ID ?? null;
+					if ( empty( $variation_id ) ) {
+						return null;
+					}
+
+					$url = get_post_meta( (int) $variation_id, '_hws_source_image', true );
+					return $url ?: null;
+				},
+			]
+		);
+
 		/**
 		 * 3) Поле hwsCommerceInfo на интерфейсе Product — условия доставки/оплаты/гарантии
 		 *    по бренду товара. Источник данных — плагин hws-commerce-info (его публичный
