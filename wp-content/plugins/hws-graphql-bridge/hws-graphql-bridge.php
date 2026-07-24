@@ -243,6 +243,24 @@ add_action(
 			]
 		);
 
+		register_graphql_field(
+			'ProductVariation',
+			'hwsSourceOptionsJson',
+			[
+				'type'        => 'String',
+				'description' => __( 'JSON исходных опций производителя для вариации', 'hws-graphql-bridge' ),
+				'resolve'     => function ( $source ) {
+					$variation_id = $source->databaseId ?? $source->ID ?? null;
+					if ( empty( $variation_id ) ) {
+						return null;
+					}
+
+					$value = get_post_meta( (int) $variation_id, '_hws_source_options', true );
+					return $value ?: null;
+				},
+			]
+		);
+
 		/**
 		 * 3) Поле hwsCommerceInfo на интерфейсе Product — условия доставки/оплаты/гарантии
 		 *    по бренду товара. Источник данных — плагин hws-commerce-info (его публичный
