@@ -512,7 +512,7 @@ function updateAttrDropdowns(card, attrs) {
                 <option value="">— Выберите атрибут —</option>
                 <?php if ($attr_slug) : ?>
                     <option value="<?php echo esc_attr($attr_slug); ?>" selected>
-                        <?php echo esc_html(self::attribute_label($attr_slug)); ?>
+                        <?php echo esc_html(wc_attribute_label($attr_slug) ?: $attr_slug); ?>
                     </option>
                 <?php endif; ?>
             </select>
@@ -538,7 +538,7 @@ function updateAttrDropdowns(card, attrs) {
                 $lbl = sanitize_text_field($b['label'] ?? '');
                 if (empty($b['attr_slug']) && $lbl === '') continue;
                 $blocks[] = [
-                    'attr_slug' => sanitize_text_field((string) ($b['attr_slug'] ?? '')),
+                    'attr_slug' => sanitize_key($b['attr_slug'] ?? ''),
                     'label'     => $lbl,
                 ];
             }
@@ -577,15 +577,11 @@ function updateAttrDropdowns(card, attrs) {
         foreach ($product_ids as $pid) {
             $p = wc_get_product($pid);
             if (!$p) continue;
-            foreach ($p->get_attributes() as $attr) {
-                if (!$attr instanceof WC_Product_Attribute) continue;
-                $name = trim((string) $attr->get_name());
-                if ($name === '' || isset($attrs[$name])) continue;
-                $attrs[$name] = self::attribute_label($name);
+            foreach ($p->get_attributes() as $key => $attr) {
+                if (str_starts_with($key, 'pa_') && !isset($attrs[$key])) {
+                    $attrs[$key] = wc_attribute_label($key) ?: $key;
+                }
             }
-        }
-        if (!empty($attrs)) {
-            natcasesort($attrs);
         }
         wp_send_json_success($attrs);
     }
@@ -713,85 +709,17 @@ function updateAttrDropdowns(card, attrs) {
 
         $result = [];
         foreach ($cfg['blocks'] as $block) {
-            $slug  = trim((string) ($block['attr_slug'] ?? ''));
-            $label = $block['label'] ?? '';
-            if ($slug === '') continue;
-            $value = self::product_attribute_value($wc, $slug);
-            if ($value === '') continue;
+            $slug  = $block['attr_slug'] ?? '';
+            $label = $block['label']     ?? '';
+            if (!$slug) continue;
+            $value = $wc->get_attribute($slug);
+            if ($value === '' || $value === false) continue;
             $result[] = [
                 'value' => $value,
-                'label' => $label ?: self::attribute_label($slug),
+                'label' => $label ?: wc_attribute_label($slug),
             ];
         }
         return $result;
-    }
-
-    private static function attribute_label(string $attr_name): string {
-        $attr_name = trim($attr_name);
-        if ($attr_name === '') return '';
-
-        $label = wc_attribute_label($attr_name);
-        return is_string($label) && $label !== '' ? $label : $attr_name;
-    }
-
-    private static function product_attribute_value(WC_Product $product, string $attr_name): string {
-        $attr_name = trim($attr_name);
-        if ($attr_name === '') return '';
-
-        $direct = $product->get_attribute($attr_name);
-        if (is_string($direct) && $direct !== '') {
-            return $direct;
-        }
-
-        $needle = array_unique(array_filter([
-            $attr_name,
-            sanitize_title($attr_name),
-            wc_sanitize_taxonomy_name($attr_name),
-        ]));
-
-        foreach ($product->get_attributes() as $key => $attr) {
-            if (!$attr instanceof WC_Product_Attribute) {
-                continue;
-            }
-
-            $haystack = array_unique(array_filter([
-                (string) $key,
-                (string) $attr->get_name(),
-                sanitize_title((string) $key),
-                sanitize_title((string) $attr->get_name()),
-                wc_sanitize_taxonomy_name((string) $key),
-                wc_sanitize_taxonomy_name((string) $attr->get_name()),
-            ]));
-
-            if (!array_intersect($needle, $haystack)) {
-                continue;
-            }
-
-            $resolved = $product->get_attribute((string) $key);
-            if (is_string($resolved) && $resolved !== '') {
-                return $resolved;
-            }
-
-            $options = $attr->get_options();
-            if (!is_array($options) || empty($options)) {
-                return '';
-            }
-
-            if ($attr->is_taxonomy()) {
-                $names = [];
-                foreach ($options as $term_id) {
-                    $term = get_term((int) $term_id, (string) $attr->get_name());
-                    if ($term && !is_wp_error($term)) {
-                        $names[] = $term->name;
-                    }
-                }
-                return implode(', ', array_filter($names, 'strlen'));
-            }
-
-            return implode(', ', array_filter(array_map('strval', $options), 'strlen'));
-        }
-
-        return '';
     }
 
     // ─── Resolution ──────────────────────────────────────────────────────
