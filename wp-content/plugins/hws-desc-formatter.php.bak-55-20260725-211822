@@ -11,7 +11,6 @@ defined('ABSPATH') || exit;
 final class HWS_Desc_Formatter {
 
     private const FORMAT_META_KEY = '_hws_desc_formatted';
-    private const CLEAN_EXCERPT_META_KEY = '_hws_short_desc_cleaned';
     private const TRANSLATE_META_KEY = '_hws_desc_translated';
     private const TRANSLATE_REPORT_META_KEY = '_hws_desc_translate_report';
     private const CATEGORY_META_KEY = '_hws_category_checked';
@@ -442,26 +441,6 @@ PROMPT;
                             <span id="hws-format-progress-label">0 / 0</span>
                         </div>
                         <div class="hws-log" id="hws-format-log"></div>
-                    </div>
-
-                    <div class="hws-section">
-                        <h2>Очистка коротких описаний</h2>
-                        <p class="hws-subtitle">Удаляет теги, shortcode, переносы и HTML entities из краткого описания, затем сохраняет одну строку.</p>
-                        <div class="hws-kpi" id="hws-clean-excerpt-kpi">
-                            <div class="hws-kpi-card"><strong id="hws-clean-excerpt-total">0</strong><span>Всего</span></div>
-                            <div class="hws-kpi-card"><strong id="hws-clean-excerpt-done">0</strong><span>Готово</span></div>
-                            <div class="hws-kpi-card"><strong id="hws-clean-excerpt-left">0</strong><span>Осталось</span></div>
-                        </div>
-                        <div class="hws-controls">
-                            <button class="button button-primary" id="hws-clean-excerpt-start-btn" disabled>▶ Очистить короткие описания</button>
-                            <button class="button" id="hws-clean-excerpt-stop-btn" style="display:none">⏹ Остановить</button>
-                            <button class="button" id="hws-clean-excerpt-reset-btn" style="display:none">↺ Сбросить отметки</button>
-                        </div>
-                        <div class="hws-progress" id="hws-clean-excerpt-progress">
-                            <div class="hws-bar-outer"><div class="hws-bar-inner" id="hws-clean-excerpt-bar" style="width:0%"></div></div>
-                            <span id="hws-clean-excerpt-progress-label">0 / 0</span>
-                        </div>
-                        <div class="hws-log" id="hws-clean-excerpt-log"></div>
                     </div>
 
                     <div class="hws-section">
@@ -1116,22 +1095,6 @@ PROMPT;
                 resetConfirm: 'Сбросить все отметки форматирования? Все товары будут отформатированы заново.'
             });
 
-            var cleanExcerptRunner = createRunner('clean_excerpt', {
-                startBtn: '#hws-clean-excerpt-start-btn',
-                stopBtn: '#hws-clean-excerpt-stop-btn',
-                resetBtn: '#hws-clean-excerpt-reset-btn',
-                progressWrap: '#hws-clean-excerpt-progress',
-                progressLabel: '#hws-clean-excerpt-progress-label',
-                bar: '#hws-clean-excerpt-bar',
-                log: '#hws-clean-excerpt-log',
-                totalEl: '#hws-clean-excerpt-total',
-                doneEl: '#hws-clean-excerpt-done',
-                leftEl: '#hws-clean-excerpt-left',
-                startMessage: 'Запуск очистки коротких описаний…',
-                finishMessage: 'Короткие описания очищены',
-                resetConfirm: 'Сбросить отметки очистки коротких описаний? Все товары будут проверены заново.'
-            });
-
             var translateRunner = createRunner('translate', {
                 scanRequired: true,
                 scanBtn: '#hws-translate-scan-btn',
@@ -1155,7 +1118,6 @@ PROMPT;
             });
 
             formatRunner.loadStatus();
-            cleanExcerptRunner.loadStatus();
             translateRunner.loadStatus();
             loadActivityLog();
         })(jQuery);
@@ -1199,7 +1161,7 @@ PROMPT;
         $settings = self::settings();
         $api_key = (string) ($settings['api_key'] ?? '');
         $model = (string) ($settings['model'] ?? 'meta-llama/llama-3.1-8b-instruct:free');
-        if ($mode !== 'clean_excerpt' && $api_key === '') {
+        if ($api_key === '') {
             wp_send_json_error('API ключ не задан');
         }
 
@@ -1301,19 +1263,15 @@ PROMPT;
             ]);
         }
 
-        if ($mode === 'format') {
-            $result = self::process_format($post, $api_key, $model);
-        } elseif ($mode === 'clean_excerpt') {
-            $result = self::process_clean_excerpt($post);
-        } else {
-            $result = self::process_translate(
+        $result = $mode === 'format'
+            ? self::process_format($post, $api_key, $model)
+            : self::process_translate(
                 $post,
                 $api_key,
                 $model,
                 self::request_string('from_lang', $settings['translate_from'] ?? 'ru'),
                 self::request_string('to_lang', $settings['translate_to'] ?? 'en')
             );
-        }
 
         if (!empty($result['mark'])) {
             update_post_meta($product_id, $meta_key, $result['mark']);
@@ -1496,61 +1454,6 @@ PROMPT;
         ]);
 
         return ['mark' => '1'];
-    }
-
-    private static function process_clean_excerpt(WP_Post $post): array {
-        $raw = (string) $post->post_excerpt;
-        $clean = self::clean_excerpt_text($raw);
-
-        if ($clean === '') {
-            return [
-                'mark' => '1',
-                'skipped' => true,
-                'skipped_reason' => 'краткое описание пустое',
-                'details' => ['Проверка: исходное краткое описание пустое'],
-            ];
-        }
-
-        $details = [
-            'Проверка: было символов ' . mb_strlen($raw) . ', стало ' . mb_strlen($clean),
-        ];
-
-        if ($clean !== $raw) {
-            wp_update_post([
-                'ID' => $post->ID,
-                'post_excerpt' => $clean,
-            ]);
-            self::flush_product_cache($post->ID);
-            $details[] = 'Готово: краткое описание очищено и сохранено одной строкой';
-        } else {
-            $details[] = 'Готово: краткое описание уже было чистой строкой';
-        }
-
-        return ['mark' => '1', 'details' => $details];
-    }
-
-    private static function clean_excerpt_text(string $text): string {
-        $charset = get_bloginfo('charset') ?: 'UTF-8';
-        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, $charset);
-        $text = strip_shortcodes($text);
-        $text = wp_strip_all_tags($text, true);
-        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, $charset);
-        $text = str_replace("\xc2\xa0", ' ', $text);
-        $text = preg_replace('/\s+/u', ' ', $text);
-        return trim((string) $text);
-    }
-
-    private static function flush_product_cache(int $product_id): void {
-        if (function_exists('wc_delete_product_transients')) {
-            wc_delete_product_transients($product_id);
-        }
-        clean_post_cache($product_id);
-        if (function_exists('hws_revalidate')) {
-            hws_revalidate();
-        }
-        if (function_exists('hws_graphql_bridge_trigger_frontend_revalidate')) {
-            hws_graphql_bridge_trigger_frontend_revalidate();
-        }
     }
 
     private static function process_translate(WP_Post $post, string $api_key, string $model, string $from_code, string $to_code): array {
@@ -2590,17 +2493,11 @@ PROMPT;
 
     private static function requested_mode(): string {
         $mode = self::request_string('mode', 'format');
-        return in_array($mode, ['format', 'translate', 'clean_excerpt'], true) ? $mode : 'format';
+        return in_array($mode, ['format', 'translate'], true) ? $mode : 'format';
     }
 
     private static function meta_key_for_mode(string $mode): string {
-        if ($mode === 'translate') {
-            return self::TRANSLATE_META_KEY;
-        }
-        if ($mode === 'clean_excerpt') {
-            return self::CLEAN_EXCERPT_META_KEY;
-        }
-        return self::FORMAT_META_KEY;
+        return $mode === 'translate' ? self::TRANSLATE_META_KEY : self::FORMAT_META_KEY;
     }
 
     private static function request_string(string $key, string $default = ''): string {
@@ -2617,7 +2514,7 @@ PROMPT;
             return;
         }
 
-        $mode = in_array($mode, ['format', 'translate', 'clean_excerpt', 'settings', 'system'], true) ? $mode : 'system';
+        $mode = in_array($mode, ['format', 'translate', 'settings', 'system'], true) ? $mode : 'system';
         $level = in_array($level, ['ok', 'err', 'info'], true) ? $level : 'info';
         $logs = self::activity_logs();
         array_unshift($logs, [
