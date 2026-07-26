@@ -38,43 +38,54 @@ final class HWS_Catalog_Filters {
         $cat_id = absint($_POST['cat_id'] ?? 0);
         if (!$cat_id) wp_send_json_error('No category');
 
-        wp_send_json_success(self::global_product_attributes());
-    }
-
-    private static function global_product_attributes(): array {
         global $wpdb;
 
+        $term_ids = array_merge([$cat_id], (array) get_term_children($cat_id, 'product_cat'));
+        $term_ids = array_map('intval', $term_ids);
+
+        $tt_ph  = implode(',', array_fill(0, count($term_ids), '%d'));
+        $tt_ids = $wpdb->get_col($wpdb->prepare(
+            "SELECT term_taxonomy_id FROM {$wpdb->term_taxonomy}
+             WHERE term_id IN ($tt_ph) AND taxonomy = 'product_cat'",
+            ...$term_ids
+        ));
+
+        if (empty($tt_ids)) { wp_send_json_success([]); return; }
+
+        $tt_ph2   = implode(',', array_fill(0, count($tt_ids), '%d'));
+        $prod_ids = $wpdb->get_col($wpdb->prepare(
+            "SELECT DISTINCT tr.object_id
+             FROM {$wpdb->term_relationships} tr
+             JOIN {$wpdb->posts} p ON tr.object_id = p.ID
+             WHERE tr.term_taxonomy_id IN ($tt_ph2)
+               AND p.post_type = 'product' AND p.post_status = 'publish'
+             LIMIT 500",
+            ...$tt_ids
+        ));
+
+        if (empty($prod_ids)) { wp_send_json_success([]); return; }
+
+        $pr_ph = implode(',', array_fill(0, count($prod_ids), '%d'));
+        $used  = $wpdb->get_col($wpdb->prepare(
+            "SELECT DISTINCT tt.taxonomy
+             FROM {$wpdb->term_relationships} tr
+             JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
+             WHERE tr.object_id IN ($pr_ph) AND tt.taxonomy LIKE 'pa\_%'",
+            ...$prod_ids
+        ));
+
         $result = [];
-        $taxonomies = function_exists('wc_get_attribute_taxonomies') ? wc_get_attribute_taxonomies() : [];
-        foreach ((array) $taxonomies as $taxonomy) {
-            $name = (string) ($taxonomy->attribute_name ?? '');
-            if ($name === '') {
-                continue;
-            }
-
-            $result[] = [
-                'slug'  => 'pa_' . $name,
-                'label' => (string) (($taxonomy->attribute_label ?? '') ?: $name),
-            ];
-        }
-
-        if (empty($result)) {
-            $rows = $wpdb->get_results("SELECT attribute_name, attribute_label FROM {$wpdb->prefix}woocommerce_attribute_taxonomies ORDER BY attribute_label ASC");
-            foreach ((array) $rows as $row) {
-                $name = (string) ($row->attribute_name ?? '');
-                if ($name === '') {
-                    continue;
-                }
-
-                $result[] = [
-                    'slug'  => 'pa_' . $name,
-                    'label' => (string) (($row->attribute_label ?? '') ?: $name),
-                ];
-            }
+        foreach ($used as $tax) {
+            $attr_name = substr($tax, 3);
+            $label = $wpdb->get_var($wpdb->prepare(
+                "SELECT attribute_label FROM {$wpdb->prefix}woocommerce_attribute_taxonomies WHERE attribute_name = %s",
+                $attr_name
+            ));
+            $result[] = ['slug' => $tax, 'label' => $label ?: $attr_name];
         }
 
         usort($result, fn($a, $b) => strcmp($a['label'], $b['label']));
-        return $result;
+        wp_send_json_success($result);
     }
 
     public static function ajax_save(): void {
