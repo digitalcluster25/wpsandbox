@@ -24,14 +24,6 @@ final class HWS_Product_Parser {
             'label'      => 'Sangens',
             'categories' => ['sangens-electric-furnaces'],
         ],
-        'eos' => [
-            'label'      => 'EOS',
-            'categories' => ['eos-sauna-heaters'],
-        ],
-        'vvd' => [
-            'label'      => 'Инжкомцентр ВВД',
-            'categories' => ['vvd-electric-furnaces', 'vvd-wood-furnaces'],
-        ],
     ];
 
     private const CATEGORIES = [
@@ -48,27 +40,6 @@ final class HWS_Product_Parser {
             'url'          => 'https://sangens.com/ru/catalog/furnaces/',
             'base_url'     => 'https://sangens.com/',
             'expected'     => 25,
-        ],
-        'eos-sauna-heaters' => [
-            'manufacturer' => 'eos',
-            'label'        => 'Электрические печи для сауны',
-            'url'          => 'https://www.eos-sauna.com/en/product-overview/sauna-heaters',
-            'base_url'     => 'https://www.eos-sauna.com/',
-            'expected'     => 0,
-        ],
-        'vvd-electric-furnaces' => [
-            'manufacturer' => 'vvd',
-            'label'        => 'Электрические печи',
-            'url'          => 'https://vvd.su/product/elektricheskie-pechi-dlya-bani/',
-            'base_url'     => 'https://vvd.su/',
-            'expected'     => 0,
-        ],
-        'vvd-wood-furnaces' => [
-            'manufacturer' => 'vvd',
-            'label'        => 'Дровяные печи',
-            'url'          => 'https://vvd.su/product/drovyanye-pechi-dlya-bani-i-sauny/',
-            'base_url'     => 'https://vvd.su/',
-            'expected'     => 0,
         ],
     ];
 
@@ -128,14 +99,6 @@ final class HWS_Product_Parser {
         'fuel_type',
         'steam_volume',
         'power',
-    ];
-
-    private const EOS_REQUIRED_PRODUCT_FIELDS = [
-        'brand', 'source_url', 'title', 'article', 'offer_image', 'fuel_type', 'power',
-    ];
-
-    private const VVD_REQUIRED_PRODUCT_FIELDS = [
-        'brand', 'source_url', 'title', 'article', 'offer_image', 'fuel_type',
     ];
 
     private const OPTIONAL_PRODUCT_FIELDS = [
@@ -681,8 +644,7 @@ final class HWS_Product_Parser {
         $expected = (int) (self::CATEGORIES[$category]['expected'] ?? 0);
         self::mark_status(
             self::status_key('category', $manufacturer, $category),
-            (($expected > 0 ? count($products) === $expected : count($products) > 0)
-                && $parsed_products === count($products) && !$errors),
+            count($products) === $expected && $parsed_products === count($products) && !$errors,
             'products=' . count($products) . '; parsed_products=' . $parsed_products . '; errors=' . count($errors)
         );
     }
@@ -1078,12 +1040,6 @@ final class HWS_Product_Parser {
         if ($manufacturer === 'sangens') {
             return self::extract_sangens_category_products($html, $category);
         }
-        if ($manufacturer === 'vvd') {
-            return self::extract_vvd_category_products($html, $category);
-        }
-        if ($manufacturer === 'eos') {
-            return self::extract_eos_category_products($html, $category);
-        }
 
         $products = [];
         if (!preg_match_all('~<div class=["\'][^"\']*(?<![\w-])product-card(?![\w-])[^"\']*["\'][\s\S]*?<a href=["\']([^"\']+)["\'][^>]*class=["\'][^"\']*product-card__link[^"\']*["\'][^>]*>[\s\S]*?<div class=["\'][^"\']*product-card__title[^"\']*["\'][^>]*>(.*?)</div>\s*(?:<div class=["\'][^"\']*product-card__text[^"\']*["\'][^>]*>(.*?)</div>)?~isu', $html, $matches, PREG_SET_ORDER)) {
@@ -1113,71 +1069,6 @@ final class HWS_Product_Parser {
 
         uasort($products, static fn(array $a, array $b): int => strnatcasecmp($a['title'], $b['title']));
 
-        return $products;
-    }
-
-    private static function extract_vvd_category_products(string $html, string $category): array {
-        $products = [];
-        $root = $category === 'vvd-electric-furnaces'
-            ? '/product/elektricheskie-pechi-dlya-bani/'
-            : '/product/drovyanye-pechi-dlya-bani-i-sauny/';
-        $blocked = ['pulty-', 'dymokhod', 'obliv', 'dopolnit', 'nebulayzer', 'filter', 'clear'];
-        if (!preg_match_all("~<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>~isu", $html, $matches, PREG_SET_ORDER)) {
-            return [];
-        }
-        foreach ($matches as $match) {
-            $absolute = self::absolute_url(html_entity_decode($match[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), 'https://vvd.su/');
-            $path = (string) wp_parse_url($absolute, PHP_URL_PATH);
-            if (!str_starts_with($path, $root) || trim($path, '/') === trim($root, '/')) {
-                continue;
-            }
-            $lower = mb_strtolower($path);
-            $skip = false;
-            foreach ($blocked as $word) {
-                if (str_contains($lower, $word)) {
-                    $skip = true;
-                    break;
-                }
-            }
-            if ($skip) {
-                continue;
-            }
-            $title = trim((string) preg_replace('~\\s+~u', ' ', wp_strip_all_tags($match[2])));
-            if ($title === '' || mb_strlen($title) < 4) {
-                $title = ucwords(str_replace(['-', '_'], ' ', basename(trim($path, '/'))));
-            }
-            $products[self::product_id_from_url($absolute)] = ['title' => $title, 'url' => $absolute];
-        }
-        uasort($products, static fn(array $a, array $b): int => strnatcasecmp($a['title'], $b['title']));
-        return $products;
-    }
-
-    private static function extract_eos_category_products(string $html, string $category): array {
-        $products = [];
-        $pages = [$html];
-        if (preg_match_all("~href=[\"']([^\"']*/en/products/[^\"']*/sauna-heaters/[^\"']+)[\"']~iu", $html, $matches)) {
-            foreach (array_unique($matches[1]) as $url) {
-                $pages[] = self::fetch_html(self::absolute_url(html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8'), 'https://www.eos-sauna.com/'));
-            }
-        }
-        foreach ($pages as $page) {
-            if (!preg_match_all("~<a\\b[^>]*href=[\"']([^\"']*/en/products/[^\"']+)[\"'][^>]*>(.*?)</a>~isu", $page, $matches, PREG_SET_ORDER)) {
-                continue;
-            }
-            foreach ($matches as $match) {
-                $absolute = self::absolute_url(html_entity_decode($match[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), 'https://www.eos-sauna.com/');
-                $path = (string) wp_parse_url($absolute, PHP_URL_PATH);
-                if (!str_contains($path, '/sauna-heaters/') || str_ends_with($path, '/sauna-heaters')) {
-                    continue;
-                }
-                $title = trim((string) preg_replace('~\\s+~u', ' ', wp_strip_all_tags($match[2])));
-                if ($title === '' || mb_strlen($title) < 4) {
-                    $title = ucwords(str_replace(['-', '_'], ' ', basename(trim($path, '/'))));
-                }
-                $products[self::product_id_from_url($absolute)] = ['title' => $title, 'url' => $absolute];
-            }
-        }
-        uasort($products, static fn(array $a, array $b): int => strnatcasecmp($a['title'], $b['title']));
         return $products;
     }
 
@@ -1269,9 +1160,6 @@ final class HWS_Product_Parser {
         if ($manufacturer === 'sangens') {
             return self::extract_sangens_product_fields($html, $source_url);
         }
-        if ($manufacturer === 'eos' || $manufacturer === 'vvd') {
-            return self::extract_generic_manufacturer_product_fields($html, $manufacturer, $source_url);
-        }
 
         $text_blocks = self::extract_tab_texts($html);
         $chars       = self::extract_characteristics($html);
@@ -1297,37 +1185,6 @@ final class HWS_Product_Parser {
             'door_side'         => self::normalize_side(self::first_present($options, $chars, ['Исполнение дверки', 'Сторона дверки'])),
             'stone_side'        => self::normalize_side(self::first_present($options, $chars, ['Боковой вход в каменку'])),
             'chimney_side'      => self::normalize_side(self::first_present($options, $chars, ['Боковое подключение дымохода'])),
-        ];
-    }
-
-    private static function extract_generic_manufacturer_product_fields(string $html, string $manufacturer, string $source_url): array {
-        $chars = self::extract_characteristics($html);
-        $options = self::extract_options($html);
-        $text = wp_strip_all_tags($html);
-        $brand = $manufacturer === 'eos' ? 'EOS' : 'ВВД';
-        $electric = $manufacturer === 'eos' || str_contains($source_url, 'elektricheskie');
-        $title = self::extract_first_text($html, ['~<h1[^>]*>(.*?)</h1>~isu', '~<title[^>]*>(.*?)</title>~isu']);
-        $power = self::first_present($options, $chars, ['Мощность', 'Power', 'Heating capacity']);
-        if ($power === '' && preg_match('~(\\d+(?:[.,]\\d+)?)\\s*(?:кВт|kW)~iu', $text, $m)) {
-            $power = $m[1] . ' кВт';
-        }
-        $article = self::extract_article($html);
-        if ($article === '' && preg_match('~(?:article|артикул|art\\.?)[^A-Za-zА-Яа-я0-9]{0,10}([A-Za-zА-Яа-я0-9._/-]{3,})~iu', $text, $m)) {
-            $article = trim($m[1]);
-        }
-        if ($article === '') {
-            $article = strtoupper($manufacturer) . '-' . substr(md5($source_url), 0, 12);
-        }
-        $category = $manufacturer === 'eos' ? 'sauna-stoves' : (str_contains($source_url, 'elektricheskie') ? 'sauna-stoves' : 'russian-bath-stoves');
-        return [
-            'brand' => $brand, 'source_url' => $source_url, 'title' => $title, 'article' => $article,
-            'price' => self::extract_price($html), 'offer_image' => self::extract_image($html, $manufacturer === 'eos' ? 'https://www.eos-sauna.com/' : 'https://vvd.su/'),
-            'short_description' => self::extract_meta_content($html, 'description'), 'long_description' => self::extract_meta_content($html, 'description'),
-            'characteristics' => $chars, 'fuel_type' => $electric ? 'электричество' : 'дрова',
-            'purpose' => 'баня и сауна', 'steam_volume' => self::extract_steam_volume($chars), 'model' => $title,
-            'steel_grade' => self::first_present($options, $chars, ['Марка стали', 'Steel']), 'power' => $power,
-            'voltage' => self::first_present($options, $chars, ['Напряжение', 'Voltage']), 'material' => self::first_present($options, $chars, ['Материал', 'Material']),
-            'hws_category_slug' => $category,
         ];
     }
 
@@ -1804,16 +1661,7 @@ final class HWS_Product_Parser {
     }
 
     private static function required_product_fields(string $manufacturer): array {
-        if ($manufacturer === 'sangens') {
-            return self::SANGENS_REQUIRED_PRODUCT_FIELDS;
-        }
-        if ($manufacturer === 'eos') {
-            return self::EOS_REQUIRED_PRODUCT_FIELDS;
-        }
-        if ($manufacturer === 'vvd') {
-            return self::VVD_REQUIRED_PRODUCT_FIELDS;
-        }
-        return self::REQUIRED_PRODUCT_FIELDS;
+        return $manufacturer === 'sangens' ? self::SANGENS_REQUIRED_PRODUCT_FIELDS : self::REQUIRED_PRODUCT_FIELDS;
     }
 
     private static function optional_product_fields(string $manufacturer): array {
@@ -2143,9 +1991,6 @@ final class HWS_Product_Parser {
     }
 
     private static function default_category_slug(array $parsed): string {
-        if (!empty($parsed['hws_category_slug'])) {
-            return sanitize_title((string) $parsed['hws_category_slug']);
-        }
         $brand = trim((string) ($parsed['brand'] ?? ''));
         if (strcasecmp($brand, 'Sangens') === 0) {
             return 'sauna-stoves';
