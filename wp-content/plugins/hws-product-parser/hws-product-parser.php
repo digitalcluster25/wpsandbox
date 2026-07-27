@@ -1308,20 +1308,36 @@ final class HWS_Product_Parser {
         $electric = $manufacturer === 'eos' || str_contains($source_url, 'elektricheskie');
         $title = self::extract_first_text($html, ['~<h1[^>]*>(.*?)</h1>~isu', '~<title[^>]*>(.*?)</title>~isu']);
         $power = self::first_present($options, $chars, ['Мощность', 'Power', 'Heating capacity']);
+        if ($manufacturer === 'eos' && !preg_match('~\\d~', $power)) {
+            $power = '';
+        }
         if ($power === '' && preg_match('~(\\d+(?:[.,]\\d+)?)\\s*(?:кВт|kW)~iu', $text, $m)) {
             $power = $m[1] . ' кВт';
         }
         $article = self::extract_article($html);
+        if ($manufacturer === 'eos' && !preg_match('~\\d{5,}~', $article)) {
+            $article = '';
+        }
         if ($article === '' && preg_match('~(?:article|артикул|art\\.?)[^A-Za-zА-Яа-я0-9]{0,10}([A-Za-zА-Яа-я0-9._/-]{3,})~iu', $text, $m)) {
             $article = trim($m[1]);
+        }
+        if ($manufacturer === 'eos' && !preg_match('~\\d{5,}~', $article) && preg_match('~\\b\\d{5,}\\b~', $text, $m)) {
+            $article = trim($m[0]);
         }
         if ($article === '') {
             $article = strtoupper($manufacturer) . '-' . substr(md5($source_url), 0, 12);
         }
+        $image = self::extract_image($html, $manufacturer === 'eos' ? 'https://www.eos-sauna.com/' : 'https://vvd.su/');
+        if ($manufacturer === 'eos' && (str_contains($image, 'logo') || str_contains($image, 'icon'))) {
+            $image = '';
+        }
+        if ($image === '' && $manufacturer === 'eos' && preg_match("~https?://[^\"']+/(?:_processed_|produktbilder/(?!Produktuebersicht/))[^\"']+\\.(?:jpg|jpeg|png|webp)~iu", $html, $m)) {
+            $image = html_entity_decode($m[0], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
         $category = $manufacturer === 'eos' ? 'sauna-stoves' : (str_contains($source_url, 'elektricheskie') ? 'sauna-stoves' : 'russian-bath-stoves');
         return [
             'brand' => $brand, 'source_url' => $source_url, 'title' => $title, 'article' => $article,
-            'price' => self::extract_price($html), 'offer_image' => self::extract_image($html, $manufacturer === 'eos' ? 'https://www.eos-sauna.com/' : 'https://vvd.su/'),
+            'price' => self::extract_price($html), 'offer_image' => $image,
             'short_description' => self::extract_meta_content($html, 'description'), 'long_description' => self::extract_meta_content($html, 'description'),
             'characteristics' => $chars, 'fuel_type' => $electric ? 'электричество' : 'дрова',
             'purpose' => 'баня и сауна', 'steam_volume' => self::extract_steam_volume($chars), 'model' => $title,
