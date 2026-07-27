@@ -957,12 +957,10 @@ final class HWS_Product_Parser {
     }
 
     private static function sync_product_to_woocommerce(array $parsed, array $fields): void {
-        $product_id = self::ensure_store_product_id($parsed);
+        $product_id = self::store_product_id($parsed);
         if ($product_id <= 0) {
             return;
         }
-
-        self::sync_store_product_core($product_id, $parsed, $fields);
 
         $post_updates = ['ID' => $product_id];
         $should_update_post = false;
@@ -1002,19 +1000,6 @@ final class HWS_Product_Parser {
 
         if (in_array('source_url', $fields, true) && self::field_is_valid('source_url', $parsed['source_url'] ?? '')) {
             update_post_meta($product_id, '_hws_source_url', trim((string) $parsed['source_url']));
-        }
-
-        if (in_array('offer_image', $fields, true) && self::field_is_valid('offer_image', $parsed['offer_image'] ?? '')) {
-            update_post_meta($product_id, '_hws_source_base_image', trim((string) $parsed['offer_image']));
-        }
-
-        if (in_array('price', $fields, true)) {
-            update_post_meta($product_id, '_hws_price_currency', 'RUB');
-            update_post_meta(
-                $product_id,
-                '_hws_price_on_request',
-                self::field_is_valid('price', $parsed['price'] ?? '') ? 'no' : 'yes'
-            );
         }
 
         if (in_array('characteristics', $fields, true) && self::field_is_valid('characteristics', $parsed['characteristics'] ?? [])) {
@@ -1788,15 +1773,6 @@ final class HWS_Product_Parser {
         return is_string($url) ? $url : '';
     }
 
-    private static function ensure_store_product_id(array $parsed): int {
-        $product_id = self::store_product_id($parsed);
-        if ($product_id > 0) {
-            return $product_id;
-        }
-
-        return self::create_store_product($parsed);
-    }
-
     private static function store_product_id(array $parsed): int {
         $sku = trim((string) ($parsed['article'] ?? ''));
         if ($sku === '' || !function_exists('wc_get_product_id_by_sku')) {
@@ -1821,204 +1797,6 @@ final class HWS_Product_Parser {
         }
 
         return $product_id;
-    }
-
-    private static function create_store_product(array $parsed): int {
-        if (!class_exists('WC_Product_Simple')) {
-            return 0;
-        }
-
-        $sku = trim((string) ($parsed['article'] ?? ''));
-        $title = trim((string) ($parsed['title'] ?? ''));
-        if ($sku === '' || $title === '') {
-            return 0;
-        }
-
-        $product = new WC_Product_Simple();
-        $product->set_name($title);
-        $product->set_slug(self::product_slug($parsed));
-        $product->set_sku($sku);
-        $product->set_status('publish');
-        $product->set_catalog_visibility('visible');
-        $product->set_manage_stock(false);
-        $product->set_stock_status('instock');
-        $product->set_reviews_allowed(false);
-        $product->set_category_ids(self::default_category_ids($parsed));
-        $product_id = $product->save();
-
-        if ($product_id <= 0) {
-            return 0;
-        }
-
-        self::assign_brand_terms($product_id, $parsed);
-
-        return $product_id;
-    }
-
-    private static function sync_store_product_core(int $product_id, array $parsed, array $fields): void {
-        if (!function_exists('wc_get_product')) {
-            return;
-        }
-
-        $product = wc_get_product($product_id);
-        if (!$product) {
-            return;
-        }
-
-        $changed = false;
-        $title = trim((string) ($parsed['title'] ?? ''));
-        if ($title !== '' && method_exists($product, 'get_name') && $product->get_name() !== $title) {
-            $product->set_name($title);
-            $changed = true;
-        }
-
-        if (method_exists($product, 'set_status') && $product->get_status() !== 'publish') {
-            $product->set_status('publish');
-            $changed = true;
-        }
-
-        if (method_exists($product, 'set_catalog_visibility') && $product->get_catalog_visibility() !== 'visible') {
-            $product->set_catalog_visibility('visible');
-            $changed = true;
-        }
-
-        if (method_exists($product, 'set_stock_status') && $product->get_stock_status() !== 'instock') {
-            $product->set_stock_status('instock');
-            $changed = true;
-        }
-
-        $category_ids = self::default_category_ids($parsed);
-        if ($category_ids && method_exists($product, 'set_category_ids')) {
-            $current_ids = array_map('intval', $product->get_category_ids());
-            if ($current_ids !== $category_ids) {
-                $product->set_category_ids($category_ids);
-                $changed = true;
-            }
-        }
-
-        if (self::field_is_valid('price', $parsed['price'] ?? '') && method_exists($product, 'set_regular_price')) {
-            $price = self::normalized_price_value((string) $parsed['price']);
-            if ($price !== '') {
-                $product->set_regular_price($price);
-                $product->set_price($price);
-                $changed = true;
-            }
-        }
-
-        $attributes = self::build_product_attributes($parsed);
-        if ($attributes && method_exists($product, 'set_attributes')) {
-            $product->set_attributes($attributes);
-            $changed = true;
-        }
-
-        if ($changed) {
-            $product->save();
-        }
-
-        self::assign_brand_terms($product_id, $parsed);
-    }
-
-    private static function build_product_attributes(array $parsed): array {
-        if (!class_exists('WC_Product_Attribute')) {
-            return [];
-        }
-
-        $map = [
-            'pa_fuel-type' => 'fuel_type',
-            'pa_power' => 'power',
-            'pa_voltage' => 'voltage',
-            'pa_series' => 'series',
-            'pa_cladding-material' => 'material',
-            'pa_room-type' => 'mode',
-        ];
-
-        $attributes = [];
-        $position = 0;
-        foreach ($map as $attribute_name => $field) {
-            $value = trim((string) ($parsed[$field] ?? ''));
-            if ($value === '') {
-                continue;
-            }
-
-            $attribute = new WC_Product_Attribute();
-            $attribute->set_id(0);
-            $attribute->set_name($attribute_name);
-            $attribute->set_options([$value]);
-            $attribute->set_position($position++);
-            $attribute->set_visible(true);
-            $attribute->set_variation(false);
-            $attributes[] = $attribute;
-        }
-
-        return $attributes;
-    }
-
-    private static function assign_brand_terms(int $product_id, array $parsed): void {
-        if ($product_id <= 0 || !taxonomy_exists('product_brand')) {
-            return;
-        }
-
-        $brand = trim((string) ($parsed['brand'] ?? ''));
-        if ($brand === '') {
-            return;
-        }
-
-        $term = get_term_by('name', $brand, 'product_brand');
-        if (!$term || is_wp_error($term)) {
-            $created = wp_insert_term($brand, 'product_brand', ['slug' => sanitize_title($brand)]);
-            if (!is_wp_error($created) && !empty($created['term_id'])) {
-                $term = get_term((int) $created['term_id'], 'product_brand');
-            }
-        }
-
-        if ($term && !is_wp_error($term)) {
-            wp_set_object_terms($product_id, [(int) $term->term_id], 'product_brand', false);
-        }
-    }
-
-    private static function default_category_ids(array $parsed): array {
-        $slug = self::default_category_slug($parsed);
-        if ($slug === '') {
-            return [];
-        }
-
-        $term = get_term_by('slug', $slug, 'product_cat');
-        if (!$term || is_wp_error($term)) {
-            return [];
-        }
-
-        return [(int) $term->term_id];
-    }
-
-    private static function default_category_slug(array $parsed): string {
-        $brand = trim((string) ($parsed['brand'] ?? ''));
-        if (strcasecmp($brand, 'Sangens') === 0) {
-            return 'sauna-stoves';
-        }
-
-        return 'russian-bath-stoves';
-    }
-
-    private static function product_slug(array $parsed): string {
-        $brand = sanitize_title((string) ($parsed['brand'] ?? 'product'));
-        $article = sanitize_title((string) ($parsed['article'] ?? ''));
-        if ($brand !== '' && $article !== '') {
-            return $brand . '-' . $article;
-        }
-
-        return sanitize_title((string) ($parsed['title'] ?? 'product'));
-    }
-
-    private static function normalized_price_value(string $value): string {
-        $value = preg_replace('~[^\d.,]~u', '', $value);
-        $value = str_replace(',', '.', (string) $value);
-        $parts = explode('.', $value);
-        if (count($parts) > 2) {
-            $decimal = array_pop($parts);
-            $value = implode('', $parts) . '.' . $decimal;
-        }
-        $number = (float) $value;
-        return $number > 0 ? wc_format_decimal($number, 2) : '';
     }
 
     private static function paragraphs_to_html(string $value): string {
