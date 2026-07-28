@@ -18,7 +18,7 @@ final class HWS_Product_Parser {
     private const MANUFACTURERS = [
         'easysteam' => [
             'label'      => 'EasySteam',
-            'categories' => ['gelendzhik', 'anapa', 'sochi', 'yuzhnaya', 'vivarte', 'montfort', 'yalta-15', 'yalta-25', 'yalta-35', 'yalta-40'],
+            'categories' => ['gelendzhik', 'anapa', 'sochi', 'yuzhnaya', 'vivarte', 'montfort', 'yalta-15', 'yalta-25', 'yalta-35', 'yalta-40', 'anapa-k', 'sochi-k', 'gelendzhik-k'],
         ],
         'sangens' => [
             'label'      => 'Sangens',
@@ -108,6 +108,27 @@ final class HWS_Product_Parser {
             'url'          => 'https://easysteam.ru/products/category/yalta-40',
             'base_url'     => 'https://easysteam.ru/',
             'expected'     => 2,
+        ],
+        'anapa-k' => [
+            'manufacturer' => 'easysteam',
+            'label'        => 'Анапа К',
+            'url'          => 'https://easysteam.ru/products/category/anapa-k',
+            'base_url'     => 'https://easysteam.ru/',
+            'expected'     => 4,
+        ],
+        'sochi-k' => [
+            'manufacturer' => 'easysteam',
+            'label'        => 'Сочи К',
+            'url'          => 'https://easysteam.ru/products/category/sochi-k',
+            'base_url'     => 'https://easysteam.ru/',
+            'expected'     => 4,
+        ],
+        'gelendzhik-k' => [
+            'manufacturer' => 'easysteam',
+            'label'        => 'Геленджик К',
+            'url'          => 'https://easysteam.ru/products/category/gelendzhik-k',
+            'base_url'     => 'https://easysteam.ru/',
+            'expected'     => 4,
         ],
         'sangens-electric-furnaces' => [
             'manufacturer' => 'sangens',
@@ -1038,6 +1059,12 @@ final class HWS_Product_Parser {
 
         $html   = self::fetch_html($products[$product_id]['url']);
         $parsed = self::extract_product_fields($html, $manufacturer, $products[$product_id]['url']);
+        // EasySteam "-k" category lines (Анапа К, Сочи К, Геленджик К, Ялта NN К, ...) are the
+        // commercial variants — the site itself files them under "коммерческих бань и саун".
+        // Without this they'd fall through to the residential default (russian-bath-stoves).
+        if (empty($parsed['hws_category_slug']) && str_ends_with($category, '-k')) {
+            $parsed['hws_category_slug'] = 'commercial';
+        }
         $applicable_fields = self::applicable_product_fields($manufacturer, $parsed);
         $fields = $only_field === null ? $applicable_fields : [$only_field];
         $state  = self::state();
