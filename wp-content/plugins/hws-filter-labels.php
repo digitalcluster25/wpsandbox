@@ -359,11 +359,13 @@ final class HWS_Catalog_Filters {
                     cat_id: catId,
                     _ajax_nonce: nonce
                 }, function(r){
-                    $btn.prop('disabled', false).text('Обновить атрибуты');
+                    $btn.prop('disabled', false).text('Обновить список атрибутов');
                     if (!r.success) return;
 
                     var allAttrs = r.data;
-                    var saved    = $card.data('saved') || [];
+                    // Re-read current in-DOM active filters (not the stale server-rendered
+                    // data-saved) so a refresh doesn't discard unsaved add/remove edits.
+                    var saved = getActiveFilters($card);
                     // normalize legacy string format
                     var activeFilters = saved.map(function(s){
                         return typeof s === 'string' ? {slug: s, type: 'multicheck'} : s;
