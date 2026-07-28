@@ -1555,7 +1555,14 @@ final class HWS_Product_Parser {
                     if ($id === '' || $text === '') {
                         continue;
                     }
-                    $items[] = ['id' => $id, 'text' => $text, 'price' => $price];
+                    $image = '';
+                    if (preg_match('~data-image=["\']([^"\']+)["\']~isu', $chunk, $m) && $m[1] !== '') {
+                        $image = str_starts_with($m[1], 'http') ? $m[1] : 'https://easysteam.ru' . $m[1];
+                    }
+                    // "checked" sits on its own line right before class= on the <input>
+                    // for whichever item is selected by default.
+                    $default = (bool) preg_match('~<input\s+checked\b~isu', $chunk);
+                    $items[] = ['id' => $id, 'text' => $text, 'price' => $price, 'image' => $image, 'default' => $default];
                 }
             }
 
@@ -1572,6 +1579,47 @@ final class HWS_Product_Parser {
             return (int) $m[1];
         }
         return 0;
+    }
+
+    /**
+     * Writes the raw radio-groups as `_hws_source_payload` (option_groups), the format the
+     * frontend's swatch UI and per-option image switching actually read (see
+     * hws-graphql-bridge.php `hwsVariantGroups`). Matches the shape already present on the
+     * reference "Геленджик М2" product: {name, delta_price, is_default, sort_order, image,
+     * additional_image} per value, grouped under {name, values}.
+     */
+    private static function sync_easysteam_source_payload(int $wc_product_id, array $groups): void {
+        if ($wc_product_id <= 0) {
+            return;
+        }
+
+        $option_groups = [];
+        foreach ($groups as $group) {
+            $values = [];
+            foreach ($group['items'] as $index => $item) {
+                $values[] = [
+                    'name'             => $item['text'],
+                    'delta_price'      => $item['price'],
+                    'is_default'       => (bool) $item['default'],
+                    'sort_order'       => $index,
+                    'image'            => $item['image'],
+                    'additional_image' => '',
+                ];
+            }
+            if ($values) {
+                $option_groups[] = ['name' => $group['title'], 'values' => $values];
+            }
+        }
+
+        if (!$option_groups) {
+            return;
+        }
+
+        update_post_meta(
+            $wc_product_id,
+            '_hws_source_payload',
+            wp_json_encode(['option_groups' => $option_groups], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+        );
     }
 
     /**
@@ -1703,6 +1751,14 @@ final class HWS_Product_Parser {
         if (!$groups) {
             return;
         }
+
+        // The frontend's swatch UI and per-option image switching read _hws_source_payload
+        // directly (see hws-graphql-bridge.php: hwsVariantGroups prefers it over the native
+        // WooCommerce attribute fallback, which carries no images at all). Write it from the
+        // raw groups regardless of whether they map to a WooCommerce attribute taxonomy below.
+        // Group "id" is left unset — the bridge slugifies the name when id is absent, which
+        // is deterministic and avoids needing the category slug at this call site.
+        self::sync_easysteam_source_payload($wc_product_id, $groups);
 
         // Groups whose title we don't recognise still need a value in every param-list
         // sent to /product/article (the endpoint 500s on incomplete combos), so they're
