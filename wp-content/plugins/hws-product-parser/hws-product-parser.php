@@ -18,7 +18,7 @@ final class HWS_Product_Parser {
     private const MANUFACTURERS = [
         'easysteam' => [
             'label'      => 'EasySteam',
-            'categories' => ['gelendzhik'],
+            'categories' => ['gelendzhik', 'anapa', 'sochi'],
         ],
         'sangens' => [
             'label'      => 'Sangens',
@@ -41,6 +41,20 @@ final class HWS_Product_Parser {
             'url'          => 'https://easysteam.ru/products/stoves/pechi/gelendzhik',
             'base_url'     => 'https://easysteam.ru/',
             'expected'     => 18,
+        ],
+        'anapa' => [
+            'manufacturer' => 'easysteam',
+            'label'        => 'Анапа',
+            'url'          => 'https://easysteam.ru/products/stoves/pechi/anapa',
+            'base_url'     => 'https://easysteam.ru/',
+            'expected'     => 15,
+        ],
+        'sochi' => [
+            'manufacturer' => 'easysteam',
+            'label'        => 'Сочи',
+            'url'          => 'https://easysteam.ru/products/stoves/pechi/sochi',
+            'base_url'     => 'https://easysteam.ru/',
+            'expected'     => 14,
         ],
         'sangens-electric-furnaces' => [
             'manufacturer' => 'sangens',
