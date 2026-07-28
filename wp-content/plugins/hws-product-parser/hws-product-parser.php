@@ -2636,6 +2636,7 @@ final class HWS_Product_Parser {
                 wp_json_encode($merged_characteristics, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
             );
             update_post_meta($wc_product_id, '_hws_specs_html', self::specs_to_html($merged_characteristics));
+            self::sync_characteristics_as_attributes($wc_product_id, $merged_characteristics);
         }
 
         if (function_exists('wc_delete_product_transients')) {
@@ -3270,6 +3271,109 @@ final class HWS_Product_Parser {
         }
 
         self::assign_brand_terms($product_id, $parsed);
+    }
+
+    // Turns every parsed characteristic (label => value) into a real WooCommerce product
+    // attribute, so it shows up in wp-admin's attribute list and can be picked in "Фильтры
+    // каталога" (per explicit instruction — the ТЗ says every characteristic should reach
+    // filters, not a hand-picked subset). WooCommerce limits attribute taxonomy slugs to 28
+    // characters, and Russian characteristic labels routinely exceed that once transliterated —
+    // so the taxonomy slug is a short stable hash of the label, while the human-readable label
+    // itself is stored as the attribute's display name (what admins actually see and pick).
+    private static function sync_characteristics_as_attributes(int $product_id, array $characteristics): void {
+        if ($product_id <= 0 || !class_exists('WC_Product_Attribute') || !function_exists('wc_create_attribute')) {
+            return;
+        }
+        $product = wc_get_product($product_id);
+        if (!$product) {
+            return;
+        }
+
+        $existing = $product->get_attributes();
+        $preserved = array_filter(
+            $existing,
+            static fn($attr): bool => $attr instanceof WC_Product_Attribute && $attr->get_variation()
+        );
+        $preserved_slugs = array_map(static fn(WC_Product_Attribute $attr): string => $attr->get_name(), $preserved);
+
+        $new_attributes = [];
+        $position = 0;
+        foreach ($characteristics as $label => $value) {
+            $label = trim((string) preg_replace('~\s+~u', ' ', (string) $label));
+            $value = trim((string) preg_replace('~\s+~u', ' ', (string) $value));
+            // Skip labels/values that are empty, absurdly long (garbled table-parsing
+            // artifacts), or would collide with a reserved WooCommerce term.
+            if ($label === '' || $value === '' || mb_strlen($label) > 80 || mb_strlen($value) > 100) {
+                continue;
+            }
+
+            $slug = 'pa_' . substr(md5($label), 0, 12);
+            if (in_array($slug, $preserved_slugs, true)) {
+                // A real variation attribute already owns this name — don't shadow it with a
+                // non-variation characteristic attribute of the same identity.
+                continue;
+            }
+            if (!taxonomy_exists($slug)) {
+                if (!self::register_characteristic_taxonomy($slug, $label)) {
+                    continue;
+                }
+            }
+
+            $attribute = new WC_Product_Attribute();
+            $attribute->set_id((int) wc_attribute_taxonomy_id_by_name(substr($slug, 3)));
+            $attribute->set_name($slug);
+            $attribute->set_options([$value]);
+            $attribute->set_position($position++);
+            $attribute->set_visible(true);
+            $attribute->set_variation(false);
+            $new_attributes[$slug] = $attribute;
+        }
+
+        if (!$new_attributes) {
+            return;
+        }
+
+        // Merge with anything already on the product (variation attrs preserved as-is, other
+        // characteristic attributes from a previous parse replaced with the fresh values).
+        $merged = $preserved;
+        foreach ($existing as $attr) {
+            if ($attr instanceof WC_Product_Attribute && !$attr->get_variation() && !isset($new_attributes[$attr->get_name()])) {
+                $merged[] = $attr;
+            }
+        }
+        foreach ($new_attributes as $attr) {
+            $merged[] = $attr;
+        }
+
+        $product->set_attributes($merged);
+        $product->save();
+    }
+
+    // Registers a new pa_* attribute taxonomy for a characteristic and makes it usable within
+    // this same request — wc_create_attribute() only persists the DB row; WooCommerce's own
+    // register_taxonomy() call for it normally only runs once at `init`
+    // (WC_Post_Types::register_taxonomies() no-ops on repeat calls), so a taxonomy created
+    // mid-request needs registering here too or wp_insert_term()/wp_set_object_terms() below
+    // would fail against an unknown taxonomy.
+    private static function register_characteristic_taxonomy(string $slug, string $label): bool {
+        $short_slug = substr($slug, 3); // wc_create_attribute() re-adds the pa_ prefix itself.
+        $created = wc_create_attribute([
+            'name' => $label,
+            'slug' => $short_slug,
+            'type' => 'select',
+        ]);
+        if (is_wp_error($created) && $created->get_error_code() !== 'invalid_product_attribute_slug_already_exists') {
+            return false;
+        }
+
+        register_taxonomy($slug, ['product'], [
+            'hierarchical' => false,
+            'show_ui'      => true,
+            'query_var'    => true,
+            'rewrite'      => false,
+        ]);
+
+        return taxonomy_exists($slug);
     }
 
     private static function build_product_attributes(array $parsed): array {
