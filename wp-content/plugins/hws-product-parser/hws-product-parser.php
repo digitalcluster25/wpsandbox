@@ -176,6 +176,19 @@ final class HWS_Product_Parser {
         'short_description',
     ];
 
+    private const EASYSTEAM_OFFER_ATTRIBUTE_MAP = [
+        'Исполнение дверки' => 'door-side',
+        'Сторона дверки' => 'door-side',
+        'Защита топки' => 'firebox-protection',
+        'Вид топлива' => 'fuel-type',
+        'Тип топлива' => 'fuel-type',
+        'Марка стали' => 'steel-grade',
+        'Боковой вход в каменку' => 'stone-entry-side',
+        'Боковое подключение дымохода' => 'chimney-connection-side',
+        'Варианты кожуха' => 'cladding-type',
+        'Вид кожуха' => 'cladding-type',
+    ];
+
     private const MANUFACTURER_MAPPING = [
         ['source' => 'EasySteam', 'target' => 'Product brand'],
         ['source' => 'Печи для русской бани / Геленджик', 'target' => 'WooCommerce category scope'],
@@ -993,6 +1006,13 @@ final class HWS_Product_Parser {
         }
         self::sync_product_to_woocommerce($parsed, $sync_fields);
 
+        if ($manufacturer === 'easysteam' && $only_field === null) {
+            $wc_product_id = self::store_product_id($parsed);
+            if ($wc_product_id > 0) {
+                self::sync_easysteam_offer_variations($wc_product_id, $product_id, $html, $parsed);
+            }
+        }
+
         foreach ($fields as $field) {
             self::mark_status(
                 self::status_key('field', $manufacturer, $category, $product_id, $field),
@@ -1497,6 +1517,285 @@ final class HWS_Product_Parser {
         }
 
         return $options;
+    }
+
+    /**
+     * Parses each `.radio-group` block into its title plus the list of selectable offer
+     * items (id/text/price delta), mirroring the data the site's own JS reads client-side
+     * to sum the offer price and build the `param-list` sent to /product/article.
+     */
+    private static function extract_radio_groups(string $html): array {
+        $groups = [];
+        if (!preg_match_all('~<div class=["\'][^"\']*(?<![\w-])radio-group(?![\w-])[^"\']*["\'][^>]*>(.*?)(?=<div class=["\'][^"\']*(?<![\w-])radio-group(?![\w-])[^"\']*["\']|<button[^>]*class=["\'][^"\']*js-btn-item-cart-add|<div class=["\'][^"\']*product-tabs|$)~isu', $html, $blocks, PREG_SET_ORDER)) {
+            return $groups;
+        }
+
+        foreach ($blocks as $block) {
+            $body  = $block[1];
+            $title = self::extract_first_text($body, ['~class=["\'][^"\']*radio-group__title[^"\']*["\'][^>]*>(.*?)</~isu']);
+            if ($title === '') {
+                continue;
+            }
+
+            $items = [];
+            if (preg_match_all('~class=["\']radio-group__item["\']>(.*?)(?=class=["\']radio-group__item["\']|class=["\'][^"\']*radio-group__items|$)~isu', $body, $item_blocks, PREG_SET_ORDER)) {
+                foreach ($item_blocks as $item_block) {
+                    $chunk = $item_block[1];
+                    $price = 0;
+                    if (preg_match('~data-price=["\'](-?\d+)["\']~isu', $chunk, $m)) {
+                        $price = (int) $m[1];
+                    }
+                    $id = '';
+                    if (preg_match('~js-radio-group__label["\'][^>]*data-id=["\']([a-f0-9-]+)["\']~isu', $chunk, $m)) {
+                        $id = $m[1];
+                    }
+                    $text = self::extract_first_text($chunk, ['~radio-group__item-text[^"\']*["\'][^>]*>(.*?)</~isu']);
+                    if ($id === '' || $text === '') {
+                        continue;
+                    }
+                    $items[] = ['id' => $id, 'text' => $text, 'price' => $price];
+                }
+            }
+
+            if ($items) {
+                $groups[] = ['title' => $title, 'items' => $items];
+            }
+        }
+
+        return $groups;
+    }
+
+    private static function extract_base_offer_price(string $html): int {
+        if (preg_match('~data-base-price=["\'](\d+)["\']~isu', $html, $m)) {
+            return (int) $m[1];
+        }
+        return 0;
+    }
+
+    /**
+     * Cartesian product across offer groups: one item picked per group. Mirrors the
+     * combinations a shopper can build with the source site's radio selectors.
+     */
+    private static function cartesian_offer_combos(array $groups): array {
+        $combos = [[]];
+        foreach ($groups as $group) {
+            $next = [];
+            foreach ($combos as $combo) {
+                foreach ($group['items'] as $item) {
+                    $next[] = array_merge($combo, [['group' => $group, 'item' => $item]]);
+                }
+            }
+            $combos = $next;
+        }
+        return $combos;
+    }
+
+    /**
+     * Resolves the real article/SKU for a specific offer combination by calling the same
+     * endpoint the source site's own "Add to cart" button uses
+     * (see app.js: axios.post("/product/article", {product, param-list})).
+     */
+    private static function resolve_offer_article(string $product_uuid, array $param_ids): string {
+        $response = wp_remote_post('https://easysteam.ru/product/article', [
+            'timeout' => 20,
+            'headers' => ['User-Agent' => 'HWS Product Parser/0.1'],
+            'body'    => [
+                'product'    => $product_uuid,
+                'param-list' => implode(',', $param_ids),
+            ],
+        ]);
+
+        if (is_wp_error($response)) {
+            return '';
+        }
+        $code = (int) wp_remote_retrieve_response_code($response);
+        if ($code < 200 || $code >= 300) {
+            return '';
+        }
+        $data = json_decode(wp_remote_retrieve_body($response), true);
+        return isset($data['article']) ? trim((string) $data['article']) : '';
+    }
+
+    /**
+     * Downloads a source offer image into the media library, reusing an existing
+     * attachment if the same source URL was already sideloaded on a previous parse.
+     */
+    private static function sideload_offer_image(string $url): int {
+        if ($url === '') {
+            return 0;
+        }
+
+        $existing = get_posts([
+            'post_type'      => 'attachment',
+            'posts_per_page' => 1,
+            'fields'         => 'ids',
+            'meta_key'       => '_hws_original_source_image',
+            'meta_value'     => $url,
+        ]);
+        if ($existing) {
+            return (int) $existing[0];
+        }
+
+        require_once ABSPATH . 'wp-admin/includes/media.php';
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+        require_once ABSPATH . 'wp-admin/includes/image.php';
+
+        $attachment_id = media_sideload_image($url, 0, null, 'id');
+        if (is_wp_error($attachment_id)) {
+            return 0;
+        }
+
+        update_post_meta((int) $attachment_id, '_hws_original_source_image', $url);
+        return (int) $attachment_id;
+    }
+
+    /**
+     * Builds/refreshes a real WooCommerce variable product + variations for an EasySteam
+     * product page that exposes offer selectors (radio-group blocks). Leaves the product
+     * as a simple product when the page has no offers to combine.
+     */
+    private static function sync_easysteam_offer_variations(int $wc_product_id, string $product_uuid, string $html, array $parsed): void {
+        if ($wc_product_id <= 0 || !class_exists('WC_Product_Variable') || !class_exists('WC_Product_Variation')) {
+            return;
+        }
+
+        $groups = self::extract_radio_groups($html);
+        if (!$groups) {
+            return;
+        }
+
+        $mapped_groups = [];
+        foreach ($groups as $group) {
+            $slug = self::EASYSTEAM_OFFER_ATTRIBUTE_MAP[$group['title']] ?? '';
+            if ($slug === '' || !taxonomy_exists('pa_' . $slug)) {
+                continue;
+            }
+            $mapped_groups[] = $group + ['taxonomy' => $slug];
+        }
+        if (!$mapped_groups) {
+            return;
+        }
+
+        $base_price = self::extract_base_offer_price($html);
+        if ($base_price <= 0) {
+            $base_price = (int) preg_replace('~\D~', '', (string) ($parsed['price'] ?? ''));
+        }
+
+        if (get_post_type($wc_product_id) !== 'product') {
+            return;
+        }
+        $product = wc_get_product($wc_product_id);
+        if (!$product) {
+            return;
+        }
+        if ($product->get_type() !== 'variable') {
+            wp_set_object_terms($wc_product_id, 'variable', 'product_type');
+            clean_post_cache($wc_product_id);
+            $product = wc_get_product($wc_product_id);
+        }
+        if (!$product || !$product->is_type('variable')) {
+            return;
+        }
+
+        $wc_attributes = [];
+        foreach ($mapped_groups as $group) {
+            $taxonomy = 'pa_' . $group['taxonomy'];
+            $term_ids = [];
+            foreach ($group['items'] as $item) {
+                $term = get_term_by('name', $item['text'], $taxonomy);
+                if (!$term) {
+                    $created = wp_insert_term($item['text'], $taxonomy);
+                    if (is_wp_error($created)) {
+                        continue;
+                    }
+                    $term = get_term((int) $created['term_id'], $taxonomy);
+                }
+                if ($term && !is_wp_error($term)) {
+                    $term_ids[] = (int) $term->term_id;
+                }
+            }
+            if (!$term_ids) {
+                continue;
+            }
+            wp_set_object_terms($wc_product_id, $term_ids, $taxonomy, false);
+
+            $attribute = new WC_Product_Attribute();
+            $attribute->set_id((int) wc_attribute_taxonomy_id_by_name($group['taxonomy']));
+            $attribute->set_name($taxonomy);
+            $attribute->set_options($term_ids);
+            $attribute->set_visible(true);
+            $attribute->set_variation(true);
+            $wc_attributes[] = $attribute;
+        }
+        if (!$wc_attributes) {
+            return;
+        }
+        $product->set_attributes($wc_attributes);
+        $product->save();
+
+        $combos = self::cartesian_offer_combos($mapped_groups);
+        $first_image_id = 0;
+
+        foreach ($combos as $combo) {
+            $param_ids = array_map(static fn(array $c): string => $c['item']['id'], $combo);
+            $article = self::resolve_offer_article($product_uuid, $param_ids);
+            if ($article === '') {
+                continue;
+            }
+
+            $price = $base_price + array_sum(array_map(static fn(array $c): int => $c['item']['price'], $combo));
+            $image_url = 'https://easysteam.ru/images/offers/' . $article . '.jpg';
+            $image_id  = self::sideload_offer_image($image_url);
+            if ($image_id && !$first_image_id) {
+                $first_image_id = $image_id;
+            }
+
+            $variation_post_id = wc_get_product_id_by_sku($article);
+            $variation = $variation_post_id > 0 ? wc_get_product($variation_post_id) : new WC_Product_Variation();
+            if (!$variation instanceof WC_Product_Variation) {
+                continue;
+            }
+            if ($variation_post_id <= 0) {
+                $variation->set_parent_id($wc_product_id);
+            }
+            $variation->set_sku($article);
+            $variation->set_status('publish');
+            $variation->set_regular_price((string) $price);
+            $variation->set_manage_stock(false);
+            $variation->set_stock_status('instock');
+
+            $attr_values = [];
+            $options_json = [];
+            foreach ($combo as $chosen) {
+                $attr_values['pa_' . $chosen['group']['taxonomy']] = sanitize_title($chosen['item']['text']);
+                $options_json[$chosen['group']['title']] = $chosen['item']['text'];
+            }
+            $variation->set_attributes($attr_values);
+            if ($image_id) {
+                $variation->set_image_id($image_id);
+            }
+            $variation_id = $variation->save();
+
+            update_post_meta($variation_id, '_hws_source_price_rub', $price);
+            update_post_meta($variation_id, '_hws_price_currency', 'RUB');
+            update_post_meta($variation_id, '_hws_price_mode', 'source-rub');
+            update_post_meta($variation_id, '_hws_source_api_param_list', implode(',', $param_ids));
+            update_post_meta($variation_id, '_hws_source_options', wp_json_encode($options_json, JSON_UNESCAPED_UNICODE));
+            if ($image_id) {
+                update_post_meta($variation_id, '_hws_source_image', wp_get_attachment_url($image_id));
+            }
+            update_post_meta($variation_id, '_hws_original_source_image', $image_url);
+        }
+
+        if (!$product->get_image_id() && $first_image_id) {
+            $product->set_image_id($first_image_id);
+            $product->save();
+        }
+
+        if (function_exists('wc_delete_product_transients')) {
+            wc_delete_product_transients($wc_product_id);
+        }
+        clean_post_cache($wc_product_id);
     }
 
     private static function extract_price(string $html): string {
