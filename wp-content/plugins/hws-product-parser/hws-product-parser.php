@@ -1327,11 +1327,35 @@ final class HWS_Product_Parser {
     }
 
     private static function extract_vvd_category_products(string $html, string $category): array {
-        $products = [];
         $root = $category === 'vvd-electric-furnaces'
             ? '/product/elektricheskie-pechi-dlya-bani/'
             : '/product/drovyanye-pechi-dlya-bani-i-sauny/';
-        $blocked = ['pulty-', 'dymokhod', 'obliv', 'dopolnit', 'nebulayzer', 'filter', 'clear'];
+        $blocked = ['pulty-', 'dymokhod', 'obliv', 'dopolnit', 'nebulayzer', 'filter', 'clear', 'dvertsy-topochnogo-tonelya'];
+
+        $level1 = self::extract_vvd_links_one_level($html, $root, $blocked);
+
+        $products = [];
+        foreach ($level1 as $id => $item) {
+            $path = (string) wp_parse_url($item['url'], PHP_URL_PATH);
+            $sub_root = rtrim($path, '/') . '/';
+            $sub_html = self::fetch_html($item['url']);
+            $sub_links = self::extract_vvd_links_one_level($sub_html, $sub_root, $blocked);
+
+            if (empty($sub_links)) {
+                $products[$id] = $item;
+                continue;
+            }
+            foreach ($sub_links as $sub_id => $sub_item) {
+                $products[$sub_id] = $sub_item;
+            }
+        }
+
+        uasort($products, static fn(array $a, array $b): int => strnatcasecmp($a['title'], $b['title']));
+        return $products;
+    }
+
+    private static function extract_vvd_links_one_level(string $html, string $root, array $blocked): array {
+        $links = [];
         if (!preg_match_all("~<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>~isu", $html, $matches, PREG_SET_ORDER)) {
             return [];
         }
@@ -1339,6 +1363,10 @@ final class HWS_Product_Parser {
             $absolute = self::absolute_url(html_entity_decode($match[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), 'https://vvd.su/');
             $path = (string) wp_parse_url($absolute, PHP_URL_PATH);
             if (!str_starts_with($path, $root) || trim($path, '/') === trim($root, '/')) {
+                continue;
+            }
+            $remainder = trim(substr($path, strlen($root)), '/');
+            if ($remainder === '' || str_contains($remainder, '/')) {
                 continue;
             }
             $lower = mb_strtolower($path);
@@ -1356,10 +1384,9 @@ final class HWS_Product_Parser {
             if ($title === '' || mb_strlen($title) < 4) {
                 $title = ucwords(str_replace(['-', '_'], ' ', basename(trim($path, '/'))));
             }
-            $products[self::product_id_from_url($absolute)] = ['title' => $title, 'url' => $absolute];
+            $links[self::product_id_from_url($absolute)] = ['title' => $title, 'url' => $absolute];
         }
-        uasort($products, static fn(array $a, array $b): int => strnatcasecmp($a['title'], $b['title']));
-        return $products;
+        return $links;
     }
 
     private static function extract_eos_category_products(string $html, string $category): array {
