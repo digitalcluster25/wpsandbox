@@ -59,7 +59,84 @@ final class HWS_Catalog_Filters {
         $cat_id = absint($_POST['cat_id'] ?? 0);
         if (!$cat_id) wp_send_json_error('No category');
 
-        wp_send_json_success(self::global_product_attributes());
+        $labels = [];
+        foreach (self::global_product_attributes() as $attr) {
+            $labels[$attr['slug']] = $attr['label'];
+        }
+
+        wp_send_json_success([
+            'available' => self::category_product_attributes($cat_id),
+            'labels'    => $labels,
+            'counts'    => self::category_attribute_counts($cat_id),
+        ]);
+    }
+
+    // Product IDs actually in this category (used to check which attributes really have data
+    // here, instead of listing every attribute taxonomy that exists site-wide regardless of
+    // whether this category's products carry it at all).
+    private static function category_product_ids(int $cat_id): array {
+        return get_posts([
+            'post_type'      => 'product',
+            'post_status'    => 'publish',
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+            'tax_query'      => [['taxonomy' => 'product_cat', 'field' => 'term_id', 'terms' => $cat_id]],
+        ]);
+    }
+
+    // slug => number of this category's products that actually carry that attribute.
+    private static function category_attribute_counts(int $cat_id): array {
+        global $wpdb;
+        $product_ids = self::category_product_ids($cat_id);
+        if (!$product_ids) {
+            return [];
+        }
+
+        $ids_sql = implode(',', array_map('intval', $product_ids));
+        $rows = $wpdb->get_results("
+            SELECT tt.taxonomy, COUNT(DISTINCT tr.object_id) AS cnt
+            FROM {$wpdb->term_relationships} tr
+            JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
+            WHERE tr.object_id IN ($ids_sql) AND tt.taxonomy LIKE 'pa\_%'
+            GROUP BY tt.taxonomy
+        ");
+        $counts = [];
+        foreach ($rows as $row) {
+            $counts[$row->taxonomy] = (int) $row->cnt;
+        }
+
+        // pa_steam-room-volume isn't actually taxonomy-driven on the storefront — the frontend
+        // computes the "Объем парной" filter from the hwsSpecs characteristics text, not a term
+        // assignment (see extractSteamRoomVolumeRange() in the frontend repo). Approximate its
+        // real availability the same way, so this one attribute's admin count isn't always 0.
+        $steam_count = 0;
+        foreach ($product_ids as $product_id) {
+            $json = (string) get_post_meta($product_id, '_hws_source_characteristics_json', true);
+            if ($json !== '' && (str_contains($json, 'объем пар') || str_contains($json, 'объём пар'))) {
+                $steam_count++;
+            }
+        }
+        if ($steam_count > 0) {
+            $counts['pa_steam-room-volume'] = $steam_count;
+        }
+
+        return $counts;
+    }
+
+    // Same shape as global_product_attributes() but scoped to what this category's products
+    // actually have — this is what the admin UI should offer to add as a new filter, and what
+    // it uses to flag already-active filters that have no real data here.
+    private static function category_product_attributes(int $cat_id): array {
+        $counts = self::category_attribute_counts($cat_id);
+        $result = [];
+        foreach (self::global_product_attributes() as $attr) {
+            if (empty($counts[$attr['slug']])) {
+                continue;
+            }
+            $attr['count'] = $counts[$attr['slug']];
+            $result[] = $attr;
+        }
+        return $result;
     }
 
     private static function global_product_attributes(): array {
@@ -151,27 +228,39 @@ final class HWS_Catalog_Filters {
             'orderby'    => 'name',
         ]);
 
-        // Computed once — same list for every category card, and cheap enough (reads the
-        // handful of registered wc attribute taxonomies) that there's no need to defer it
-        // behind an AJAX call the admin has to know to trigger.
-        $all_attrs = self::global_product_attributes();
-        $all_attrs_by_slug = [];
-        foreach ($all_attrs as $attr) {
-            $all_attrs_by_slug[$attr['slug']] = $attr['label'];
-        }
         ?>
         <div class="wrap" style="max-width:1000px">
             <h1>Фильтры каталога</h1>
+            <p style="color:#666;max-width:700px">
+                «Доступные атрибуты» ниже показывает только то, что реально есть хотя бы у одного
+                товара этой категории (с количеством товаров). Уже выбранные фильтры, у которых
+                в этой категории нет ни одного товара со значением, помечены красным — их стоит
+                удалить, иначе на сайте они всё равно не покажутся (и не выберутся сами).
+            </p>
 
             <?php if (!is_wp_error($cats)) foreach ($cats as $cat):
                 $saved = $config[(string) $cat->term_id] ?? [];
                 $saved_count = count($saved);
                 $active_slugs = array_column($saved, 'slug');
+                $counts = self::category_attribute_counts((int) $cat->term_id);
+                $available_attrs = self::category_product_attributes((int) $cat->term_id);
+                $broken_count = 0;
+                foreach ($saved as $f) {
+                    if (empty($counts[$f['slug'] ?? ''])) $broken_count++;
+                }
+            ?>
+            <?php
+                $labels_map = [];
+                foreach (self::global_product_attributes() as $attr) {
+                    $labels_map[$attr['slug']] = $attr['label'];
+                }
             ?>
             <div class="hws-cat-card"
                  data-cat-id="<?php echo (int) $cat->term_id; ?>"
                  data-saved='<?php echo wp_json_encode($saved); ?>'
-                 data-all-attrs='<?php echo wp_json_encode($all_attrs); ?>'
+                 data-all-attrs='<?php echo wp_json_encode($available_attrs); ?>'
+                 data-labels='<?php echo wp_json_encode($labels_map); ?>'
+                 data-counts='<?php echo wp_json_encode($counts); ?>'
                  style="background:#fff;border:1px solid #ddd;border-radius:4px;padding:16px;margin-bottom:12px">
 
                 <!-- Header -->
@@ -181,6 +270,9 @@ final class HWS_Catalog_Filters {
                     <span class="hws-saved-indicator" style="font-size:12px;color:<?php echo $saved_count ? '#2a7e2e' : '#999'; ?>">
                         <?php echo $saved_count ? "✓ $saved_count фильтров" : 'не настроено'; ?>
                     </span>
+                    <?php if ($broken_count > 0): ?>
+                        <span style="font-size:12px;color:#d63638">⚠ <?php echo $broken_count; ?> без данных</span>
+                    <?php endif; ?>
                     <button class="button hws-load-attrs" type="button" style="margin-left:auto">Обновить список атрибутов</button>
                 </div>
 
@@ -190,20 +282,20 @@ final class HWS_Catalog_Filters {
 
                     <!-- Available attrs -->
                     <div style="flex:1;min-width:200px">
-                        <div style="font-weight:600;font-size:13px;margin-bottom:8px;color:#555">Доступные атрибуты</div>
+                        <div style="font-weight:600;font-size:13px;margin-bottom:8px;color:#555">Доступные атрибуты (есть в товарах этой категории)</div>
                         <div class="hws-available" style="border:1px solid #ddd;border-radius:4px;padding:8px;min-height:80px;display:flex;flex-direction:column;gap:4px">
                             <?php
                             $has_available = false;
-                            foreach ($all_attrs as $attr):
+                            foreach ($available_attrs as $attr):
                                 if (in_array($attr['slug'], $active_slugs, true)) continue;
                                 $has_available = true;
                             ?>
                                 <button class="hws-attr-chip is-available" type="button" data-slug="<?php echo esc_attr($attr['slug']); ?>" data-label="<?php echo esc_attr($attr['label']); ?>">
-                                    + <?php echo esc_html($attr['label']); ?> <small style="opacity:.6">(<?php echo esc_html($attr['slug']); ?>)</small>
+                                    + <?php echo esc_html($attr['label']); ?> <small style="opacity:.6">(<?php echo (int) ($attr['count'] ?? 0); ?> тов.)</small>
                                 </button>
                             <?php endforeach; ?>
                             <?php if (!$has_available): ?>
-                                <span style="color:#999;font-size:13px">Все атрибуты добавлены</span>
+                                <span style="color:#999;font-size:13px">Нет атрибутов с данными в этой категории</span>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -218,10 +310,19 @@ final class HWS_Catalog_Filters {
                             <?php foreach ($saved as $filter):
                                 $slug = $filter['slug'] ?? '';
                                 $type = $filter['type'] ?? 'multicheck';
-                                $label = $all_attrs_by_slug[$slug] ?? self::attribute_label($slug, $slug);
+                                $label = self::attribute_label($slug, $slug);
+                                $product_count = $counts[$slug] ?? 0;
+                                $is_broken = $product_count === 0;
                             ?>
-                                <div class="hws-active-row" data-slug="<?php echo esc_attr($slug); ?>">
-                                    <span style="font-size:13px;flex:1"><?php echo esc_html($label . ' (' . $slug . ')'); ?></span>
+                                <div class="hws-active-row<?php echo $is_broken ? ' hws-active-row--broken' : ''; ?>" data-slug="<?php echo esc_attr($slug); ?>">
+                                    <span style="font-size:13px;flex:1">
+                                        <?php echo esc_html($label . ' (' . $slug . ')'); ?>
+                                        <?php if ($is_broken): ?>
+                                            <br><small style="color:#d63638">⚠ нет товаров с этим значением в категории — на сайте не покажется</small>
+                                        <?php else: ?>
+                                            <br><small style="color:#2a7e2e"><?php echo $product_count; ?> тов.</small>
+                                        <?php endif; ?>
+                                    </span>
                                     <select class="hws-type-sel">
                                         <option value="multicheck" <?php selected($type, 'multicheck'); ?>>Мультивыбор</option>
                                         <option value="input" <?php selected($type, 'input'); ?>>Ввод текста/числа</option>
@@ -287,6 +388,7 @@ final class HWS_Catalog_Filters {
             padding: 0 2px;
         }
         .hws-active-row .hws-remove:hover { color: #d63638; }
+        .hws-active-row--broken { background: #fcf0f1; border-color: #f5c2c7; }
         .hws-editor { display: flex !important; }
         </style>
 
@@ -299,34 +401,46 @@ final class HWS_Catalog_Filters {
                 return $('<span>').text(s).html();
             }
 
-            function renderAvailable($card, allAttrs, activeFilters) {
+            function renderAvailable($card, availableAttrs, activeFilters) {
                 var activeSlugs = activeFilters.map(function(f){ return f.slug; });
                 var $avail = $card.find('.hws-available').empty();
-                allAttrs.forEach(function(attr) {
+                availableAttrs.forEach(function(attr) {
                     if (activeSlugs.indexOf(attr.slug) !== -1) return;
                     $avail.append(
                         $('<button class="hws-attr-chip is-available" type="button">')
                             .data('slug', attr.slug)
                             .data('label', attr.label)
-                            .html('+ ' + escHtml(attr.label) + ' <small style="opacity:.6">(' + escHtml(attr.slug) + ')</small>')
+                            .html('+ ' + escHtml(attr.label) + ' <small style="opacity:.6">(' + (attr.count || 0) + ' тов.)</small>')
                     );
                 });
                 if ($avail.children().length === 0) {
-                    $avail.append('<span style="color:#999;font-size:13px">Все атрибуты добавлены</span>');
+                    $avail.append('<span style="color:#999;font-size:13px">Нет атрибутов с данными в этой категории</span>');
                 }
             }
 
-            function renderActive($card, allAttrs, activeFilters) {
+            // labels: {slug: label}, counts: {slug: count} — both cover every attribute, not
+            // just the ones with data, so an active-but-empty filter still gets a real label
+            // and its zero count (instead of falling back to showing the raw slug).
+            function renderActive($card, labels, counts, activeFilters) {
                 var $active = $card.find('.hws-active').empty();
                 if (activeFilters.length === 0) {
                     $active.append('<span style="color:#999;font-size:13px">Нет активных фильтров</span>');
                     return;
                 }
                 activeFilters.forEach(function(filter) {
-                    var attr = allAttrs.find(function(a){ return a.slug === filter.slug; }) || { label: filter.slug };
+                    var label = labels[filter.slug] || filter.slug;
+                    var count = counts[filter.slug] || 0;
+                    var broken = count === 0;
                     var $row = $('<div class="hws-active-row">')
+                        .toggleClass('hws-active-row--broken', broken)
                         .data('slug', filter.slug);
-                    var $label = $('<span style="font-size:13px;flex:1">').text(attr.label + ' (' + filter.slug + ')');
+                    var $label = $('<span style="font-size:13px;flex:1">')
+                        .html(
+                            escHtml(label + ' (' + filter.slug + ')') + '<br>' +
+                            (broken
+                                ? '<small style="color:#d63638">⚠ нет товаров с этим значением в категории — на сайте не покажется</small>'
+                                : '<small style="color:#2a7e2e">' + count + ' тов.</small>')
+                        );
                     var $type = $('<select class="hws-type-sel">')
                         .append('<option value="multicheck">Мультивыбор</option>')
                         .append('<option value="input">Ввод текста/числа</option>')
@@ -362,19 +476,19 @@ final class HWS_Catalog_Filters {
                     $btn.prop('disabled', false).text('Обновить список атрибутов');
                     if (!r.success) return;
 
-                    var allAttrs = r.data;
                     // Re-read current in-DOM active filters (not the stale server-rendered
                     // data-saved) so a refresh doesn't discard unsaved add/remove edits.
                     var saved = getActiveFilters($card);
-                    // normalize legacy string format
                     var activeFilters = saved.map(function(s){
                         return typeof s === 'string' ? {slug: s, type: 'multicheck'} : s;
                     });
 
-                    $card.data('all-attrs', allAttrs);
+                    $card.data('all-attrs', r.data.available);
+                    $card.data('labels', r.data.labels);
+                    $card.data('counts', r.data.counts);
                     $card.data('active-filters', activeFilters);
-                    renderAvailable($card, allAttrs, activeFilters);
-                    renderActive($card, allAttrs, activeFilters);
+                    renderAvailable($card, r.data.available, activeFilters);
+                    renderActive($card, r.data.labels, r.data.counts, activeFilters);
                     $card.find('.hws-editor').css('display', 'flex');
                 });
             });
@@ -383,26 +497,29 @@ final class HWS_Catalog_Filters {
             $(document).on('click', '.hws-available .hws-attr-chip', function(){
                 var $card   = $(this).closest('.hws-cat-card');
                 var allAttrs = $card.data('all-attrs') || [];
+                var labels = $card.data('labels') || {};
+                var counts = $card.data('counts') || {};
                 var activeFilters = getActiveFilters($card);
                 var slug    = $(this).data('slug');
-                var label   = $(this).data('label');
                 if (activeFilters.find(function(f){ return f.slug === slug; })) return;
                 activeFilters.push({ slug: slug, type: 'multicheck' });
                 $card.data('active-filters', activeFilters);
                 renderAvailable($card, allAttrs, activeFilters);
-                renderActive($card, allAttrs, activeFilters);
+                renderActive($card, labels, counts, activeFilters);
             });
 
             // Remove attr from active
             $(document).on('click', '.hws-active-row .hws-remove', function(){
                 var $card = $(this).closest('.hws-cat-card');
                 var allAttrs = $card.data('all-attrs') || [];
+                var labels = $card.data('labels') || {};
+                var counts = $card.data('counts') || {};
                 var activeFilters = getActiveFilters($card);
                 var slug = $(this).closest('.hws-active-row').data('slug');
                 activeFilters = activeFilters.filter(function(f){ return f.slug !== slug; });
                 $card.data('active-filters', activeFilters);
                 renderAvailable($card, allAttrs, activeFilters);
-                renderActive($card, allAttrs, activeFilters);
+                renderActive($card, labels, counts, activeFilters);
             });
 
             // Save
