@@ -179,6 +179,7 @@ final class HWS_Product_Parser {
     private const EASYSTEAM_OFFER_ATTRIBUTE_MAP = [
         'Исполнение дверки' => 'door-side',
         'Сторона дверки' => 'door-side',
+        'Варианты дверки' => 'door-side',
         'Защита топки' => 'firebox-protection',
         'Вид топлива' => 'fuel-type',
         'Тип топлива' => 'fuel-type',
@@ -186,6 +187,7 @@ final class HWS_Product_Parser {
         'Боковой вход в каменку' => 'stone-entry-side',
         'Боковое подключение дымохода' => 'chimney-connection-side',
         'Варианты кожуха' => 'cladding-type',
+        'Вариант кожуха' => 'cladding-type',
         'Вид кожуха' => 'cladding-type',
     ];
 
@@ -1546,7 +1548,7 @@ final class HWS_Product_Parser {
                         $price = (int) $m[1];
                     }
                     $id = '';
-                    if (preg_match('~js-radio-group__label["\'][^>]*data-id=["\']([a-f0-9-]+)["\']~isu', $chunk, $m)) {
+                    if (preg_match('~<label[^>]*class=["\'][^"\']*radio-group__label[^"\']*["\'][^>]*data-id=["\']([a-f0-9-]+)["\']~isu', $chunk, $m)) {
                         $id = $m[1];
                     }
                     $text = self::extract_first_text($chunk, ['~radio-group__item-text[^"\']*["\'][^>]*>(.*?)</~isu']);
@@ -1591,14 +1593,47 @@ final class HWS_Product_Parser {
     }
 
     /**
+     * The /product/article endpoint sits behind Laravel's CSRF middleware: a plain
+     * stateless POST gets HTTP 419 "Page Expired". A normal GET of the product page
+     * first establishes a session (izistim_session cookie) and an XSRF-TOKEN cookie
+     * that must be echoed back as the X-XSRF-TOKEN header, exactly like axios's
+     * built-in XSRF handling does for the site's own "Add to cart" button.
+     */
+    private static function fetch_easysteam_session(string $product_url): array {
+        $response = wp_remote_get($product_url, [
+            'timeout' => 20,
+            'headers' => ['User-Agent' => 'HWS Product Parser/0.1'],
+        ]);
+        if (is_wp_error($response)) {
+            return ['cookies' => [], 'xsrf' => ''];
+        }
+
+        $cookies = wp_remote_retrieve_cookies($response);
+        $xsrf = '';
+        foreach ($cookies as $cookie) {
+            if ($cookie->name === 'XSRF-TOKEN') {
+                $xsrf = urldecode($cookie->value);
+            }
+        }
+
+        return ['cookies' => $cookies, 'xsrf' => $xsrf];
+    }
+
+    /**
      * Resolves the real article/SKU for a specific offer combination by calling the same
      * endpoint the source site's own "Add to cart" button uses
      * (see app.js: axios.post("/product/article", {product, param-list})).
      */
-    private static function resolve_offer_article(string $product_uuid, array $param_ids): string {
+    private static function resolve_offer_article(string $product_uuid, array $param_ids, array $session): string {
         $response = wp_remote_post('https://easysteam.ru/product/article', [
             'timeout' => 20,
-            'headers' => ['User-Agent' => 'HWS Product Parser/0.1'],
+            'headers' => [
+                'User-Agent'       => 'HWS Product Parser/0.1',
+                'X-XSRF-TOKEN'     => $session['xsrf'] ?? '',
+                'X-Requested-With' => 'XMLHttpRequest',
+                'Referer'          => 'https://easysteam.ru/products/show/' . $product_uuid,
+            ],
+            'cookies' => $session['cookies'] ?? [],
             'body'    => [
                 'product'    => $product_uuid,
                 'param-list' => implode(',', $param_ids),
@@ -1612,8 +1647,13 @@ final class HWS_Product_Parser {
         if ($code < 200 || $code >= 300) {
             return '';
         }
-        $data = json_decode(wp_remote_retrieve_body($response), true);
-        return isset($data['article']) ? trim((string) $data['article']) : '';
+        // The endpoint double-encodes its JSON body (matches app.js: JSON.parse(t.data),
+        // where t.data was already JSON-decoded once by axios's response transform).
+        $decoded = json_decode(wp_remote_retrieve_body($response), true);
+        if (is_string($decoded)) {
+            $decoded = json_decode($decoded, true);
+        }
+        return isset($decoded['article']) ? trim((string) $decoded['article']) : '';
     }
 
     /**
@@ -1664,10 +1704,18 @@ final class HWS_Product_Parser {
             return;
         }
 
+        // Groups whose title we don't recognise still need a value in every param-list
+        // sent to /product/article (the endpoint 500s on incomplete combos), so they're
+        // "pinned" to their first offered item instead of being dropped: they affect
+        // price/article resolution but don't become a WooCommerce filter attribute.
         $mapped_groups = [];
+        $pinned_items  = [];
         foreach ($groups as $group) {
             $slug = self::EASYSTEAM_OFFER_ATTRIBUTE_MAP[$group['title']] ?? '';
             if ($slug === '' || !taxonomy_exists('pa_' . $slug)) {
+                if ($group['items']) {
+                    $pinned_items[] = $group['items'][0];
+                }
                 continue;
             }
             $mapped_groups[] = $group + ['taxonomy' => $slug];
@@ -1684,16 +1732,16 @@ final class HWS_Product_Parser {
         if (get_post_type($wc_product_id) !== 'product') {
             return;
         }
-        $product = wc_get_product($wc_product_id);
-        if (!$product) {
-            return;
-        }
-        if ($product->get_type() !== 'variable') {
+        if (wc_get_product($wc_product_id)?->get_type() !== 'variable') {
             wp_set_object_terms($wc_product_id, 'variable', 'product_type');
             clean_post_cache($wc_product_id);
-            $product = wc_get_product($wc_product_id);
         }
-        if (!$product || !$product->is_type('variable')) {
+        // Bypass wc_get_product()'s type auto-detection: within this request an earlier
+        // sync_product_to_woocommerce() call may already have cached this product as
+        // WC_Product_Simple, and that stale instance would silently swallow the
+        // variation attributes/variations built below.
+        $product = new WC_Product_Variable($wc_product_id);
+        if (!$product->get_id()) {
             return;
         }
 
@@ -1734,16 +1782,19 @@ final class HWS_Product_Parser {
         $product->save();
 
         $combos = self::cartesian_offer_combos($mapped_groups);
+        $session = self::fetch_easysteam_session('https://easysteam.ru/products/show/' . $product_uuid);
+        $pinned_ids   = array_column($pinned_items, 'id');
+        $pinned_price = array_sum(array_column($pinned_items, 'price'));
         $first_image_id = 0;
 
         foreach ($combos as $combo) {
-            $param_ids = array_map(static fn(array $c): string => $c['item']['id'], $combo);
-            $article = self::resolve_offer_article($product_uuid, $param_ids);
+            $param_ids = array_merge(array_map(static fn(array $c): string => $c['item']['id'], $combo), $pinned_ids);
+            $article = self::resolve_offer_article($product_uuid, $param_ids, $session);
             if ($article === '') {
                 continue;
             }
 
-            $price = $base_price + array_sum(array_map(static fn(array $c): int => $c['item']['price'], $combo));
+            $price = $base_price + $pinned_price + array_sum(array_map(static fn(array $c): int => $c['item']['price'], $combo));
             $image_url = 'https://easysteam.ru/images/offers/' . $article . '.jpg';
             $image_id  = self::sideload_offer_image($image_url);
             if ($image_id && !$first_image_id) {
