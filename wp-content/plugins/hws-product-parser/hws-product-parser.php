@@ -1315,6 +1315,7 @@ final class HWS_Product_Parser {
                 wp_json_encode($characteristics, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
             );
             update_post_meta($product_id, '_hws_specs_html', self::specs_to_html($characteristics));
+            self::sync_characteristics_as_attributes($product_id, $characteristics);
         }
 
         if (function_exists('wc_delete_product_transients')) {
