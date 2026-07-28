@@ -1795,8 +1795,124 @@ final class HWS_Product_Parser {
         ];
     }
 
+    // eos-sauna.com product pages render three genuinely different table shapes with the exact
+    // same "contenttable" CSS class: plain label:value pairs, a multi-column comparison table
+    // (one row per power rating), and "Power | Item no." SKU tables (sometimes several, one per
+    // named sub-variant like a Bi-O vaporizer version, each preceded by its own <h5>). A global
+    // sidebar widget ("Opening hours", "Shipping and receiving") reuses the identical class,
+    // which is why the old generic <tr><th>/<td></tr> regex — blind to table shape and running
+    // over the whole page — produced nonsense like "10,0 kW" or "Fri:" as characteristic labels.
+    // Real technical data sheets (per ТЗ) exist too, but every value they'd carry is already on
+    // this page in structured form, so no PDF parsing is needed to get accurate specs.
+    private static function extract_eos_tables(string $html): array {
+        $downloads_pos = mb_stripos($html, '<b>Downloads</b>');
+        $scoped = $downloads_pos !== false ? mb_substr($html, 0, $downloads_pos) : $html;
+
+        $dom = new DOMDocument();
+        $prev = libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="utf-8" ?>' . $scoped);
+        libxml_clear_errors();
+        libxml_use_internal_errors($prev);
+        $xpath = new DOMXPath($dom);
+
+        $chars = [];
+        $variant_articles = [];
+        $tables = $xpath->query('//table[contains(concat(" ", normalize-space(@class), " "), " contenttable ")]');
+
+        foreach ($tables as $table) {
+            $row_data = [];
+            foreach ($xpath->query('.//tr', $table) as $tr) {
+                $cells = [];
+                foreach ($xpath->query('./td', $tr) as $td) {
+                    $cells[] = trim((string) preg_replace('~\s+~u', ' ', $td->textContent));
+                }
+                if (array_filter($cells, static fn(string $c): bool => $c !== '')) {
+                    $row_data[] = $cells;
+                }
+            }
+            if (!$row_data) {
+                continue;
+            }
+
+            $header = $row_data[0];
+            $is_power_item_table = count($header) === 2
+                && stripos($header[0], 'power') !== false
+                && stripos($header[1], 'item') !== false;
+            $is_comparison_table = count($header) >= 3
+                && count(array_filter($header, static fn(string $h): bool => $h !== '')) === count($header);
+
+            if ($is_power_item_table) {
+                $variant_name = 'default';
+                $sibling = $table->previousSibling;
+                while ($sibling) {
+                    if ($sibling->nodeType === XML_ELEMENT_NODE && strtolower($sibling->nodeName) === 'h5') {
+                        $variant_name = trim($sibling->textContent);
+                        break;
+                    }
+                    $sibling = $sibling->previousSibling;
+                }
+                foreach (array_slice($row_data, 1) as $row) {
+                    if (count($row) < 2 || $row[0] === '' || $row[1] === '') {
+                        continue;
+                    }
+                    $variant_articles[$variant_name][$row[0]] = $row[1];
+                }
+                continue;
+            }
+
+            if ($is_comparison_table) {
+                $row_key_label = $header[0];
+                foreach (array_slice($row_data, 1) as $row) {
+                    if (count($row) < 2 || $row[0] === '') {
+                        continue;
+                    }
+                    $row_key = $row[0];
+                    for ($i = 1; $i < count($row); $i++) {
+                        if (empty($header[$i]) || $row[$i] === '') {
+                            continue;
+                        }
+                        $chars["{$header[$i]} ({$row_key_label}: {$row_key})"] = $row[$i];
+                    }
+                }
+                continue;
+            }
+
+            foreach ($row_data as $row) {
+                if (count($row) < 2 || $row[0] === '' || $row[1] === '') {
+                    continue;
+                }
+                $chars[$row[0]] = $row[1];
+            }
+        }
+
+        return ['characteristics' => $chars, 'variant_articles' => $variant_articles];
+    }
+
+    // Picks one representative article/SKU for the base (non-variation) product record: the
+    // lowest power rating of the first named variant. Real per-power-and-variant SKUs are
+    // preserved in $variant_articles for a future variation-builder (mirroring VVD/EasySteam),
+    // not discarded — this just keeps the current simple-product architecture honest (a real
+    // EOS item number) instead of the previous synthetic md5 hash fallback.
+    private static function eos_primary_article(array $variant_articles): string {
+        foreach ($variant_articles as $powers) {
+            foreach ($powers as $article) {
+                if ($article !== '') {
+                    return $article;
+                }
+            }
+        }
+        return '';
+    }
+
     private static function extract_generic_manufacturer_product_fields(string $html, string $manufacturer, string $source_url): array {
-        $chars = self::extract_characteristics($html);
+        $variant_articles = [];
+        if ($manufacturer === 'eos') {
+            $eos_tables = self::extract_eos_tables($html);
+            $chars = $eos_tables['characteristics'];
+            $variant_articles = $eos_tables['variant_articles'];
+        } else {
+            $chars = self::extract_characteristics($html);
+        }
         $options = self::extract_options($html);
         $text = wp_strip_all_tags($html);
         $brand = $manufacturer === 'eos' ? 'EOS' : 'ВВД';
@@ -1809,15 +1925,9 @@ final class HWS_Product_Parser {
         if ($power === '' && preg_match('~(\\d+(?:[.,]\\d+)?)\\s*(?:кВт|kW)~iu', $text, $m)) {
             $power = $m[1] . ' кВт';
         }
-        $article = self::extract_article($html);
-        if ($manufacturer === 'eos' && !preg_match('~\\d{5,}~', $article)) {
-            $article = '';
-        }
-        if ($article === '' && preg_match('~(?:article|артикул|art\\.?)[^A-Za-zА-Яа-я0-9]{0,10}([A-Za-zА-Яа-я0-9._/-]{3,})~iu', $text, $m)) {
+        $article = $manufacturer === 'eos' ? self::eos_primary_article($variant_articles) : self::extract_article($html);
+        if ($manufacturer !== 'eos' && $article === '' && preg_match('~(?:article|артикул|art\\.?)[^A-Za-zА-Яа-я0-9]{0,10}([A-Za-zА-Яа-я0-9._/-]{3,})~iu', $text, $m)) {
             $article = trim($m[1]);
-        }
-        if ($manufacturer === 'eos' && !preg_match('~\\d{5,}~', $article) && preg_match('~\\b\\d{5,}\\b~', $text, $m)) {
-            $article = trim($m[0]);
         }
         if ($article === '') {
             $article = strtoupper($manufacturer) . '-' . substr(md5($source_url), 0, 12);
@@ -1839,6 +1949,7 @@ final class HWS_Product_Parser {
             'steel_grade' => self::first_present($options, $chars, ['Марка стали', 'Steel']), 'power' => $power,
             'voltage' => self::first_present($options, $chars, ['Напряжение', 'Voltage']), 'material' => self::first_present($options, $chars, ['Материал', 'Material']),
             'hws_category_slug' => $category,
+            '_hws_article_status' => ($manufacturer === 'eos' && self::eos_primary_article($variant_articles) === '') ? 'not_found_in_source' : null,
         ];
     }
 
