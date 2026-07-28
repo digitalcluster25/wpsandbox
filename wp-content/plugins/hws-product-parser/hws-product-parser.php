@@ -316,7 +316,7 @@ final class HWS_Product_Parser {
     ];
 
     private const VVD_REQUIRED_PRODUCT_FIELDS = [
-        'brand', 'source_url', 'title', 'article', 'offer_image', 'fuel_type',
+        'brand', 'source_url', 'title', 'article', 'price', 'offer_image', 'fuel_type',
     ];
 
     private const OPTIONAL_PRODUCT_FIELDS = [

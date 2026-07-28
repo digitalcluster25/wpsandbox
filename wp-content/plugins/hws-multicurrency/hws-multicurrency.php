@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: HWS Multicurrency
- * Description: Displays WooCommerce USD prices in UZS/AZN by visitor country using official central bank rates.
- * Version: 0.1.0
+ * Description: Displays WooCommerce prices (stored in RUB) converted to the visitor's currency, using rates and settings from HWS Currency Converter (WooCommerce → Конвертер валют).
+ * Version: 0.2.0
  * Author: HWS
  */
 
@@ -11,17 +11,15 @@ if (!defined('ABSPATH')) {
 }
 
 final class HWS_Multicurrency {
-    private const BASE = 'USD';
+    // Product prices are stored in WooCommerce in this currency — see HWS_Currency_Converter's
+    // "Хранить цены в" setting, which must stay RUB for this multiplier math to be correct.
+    private const STORAGE_CURRENCY = 'RUB';
     private const COOKIE = 'hws_currency';
-    private const OPTION_RATES = 'hws_multicurrency_rates';
-    private const CRON_HOOK = 'hws_multicurrency_update_rates';
 
     private static ?string $currency = null;
 
     public static function init(): void {
         add_action('init', [__CLASS__, 'maybe_set_currency_cookie'], 1);
-        add_action('init', [__CLASS__, 'schedule_rate_updates']);
-        add_action(self::CRON_HOOK, [__CLASS__, 'update_rates']);
 
         add_filter('woocommerce_currency', [__CLASS__, 'woocommerce_currency']);
         add_filter('woocommerce_currency_symbol', [__CLASS__, 'currency_symbol'], 10, 2);
@@ -44,25 +42,6 @@ final class HWS_Multicurrency {
         add_filter('woocommerce_get_variation_prices_hash', [__CLASS__, 'variation_prices_hash'], 20, 3);
         add_shortcode('hws_currency_switcher', [__CLASS__, 'currency_switcher_shortcode']);
         add_action('wp_footer', [__CLASS__, 'render_header_switcher']);
-
-        if (!self::rates_are_fresh()) {
-            add_action('wp_loaded', [__CLASS__, 'update_rates']);
-        }
-    }
-
-    public static function activate(): void {
-        self::update_rates();
-        self::schedule_rate_updates();
-    }
-
-    public static function deactivate(): void {
-        wp_clear_scheduled_hook(self::CRON_HOOK);
-    }
-
-    public static function schedule_rate_updates(): void {
-        if (!wp_next_scheduled(self::CRON_HOOK)) {
-            wp_schedule_event(time() + HOUR_IN_SECONDS, 'twicedaily', self::CRON_HOOK);
-        }
     }
 
     public static function maybe_set_currency_cookie(): void {
@@ -81,8 +60,19 @@ final class HWS_Multicurrency {
         if (is_admin() && !wp_doing_ajax()) {
             return $currency;
         }
+        if (self::is_api_request()) {
+            return $currency;
+        }
 
         return self::current_currency();
+    }
+
+    // GraphQL (WPGraphQL, checked via the GRAPHQL_REQUEST constant it defines) and the WC REST
+    // API (REST_REQUEST) both serve the headless frontend, which expects raw storage-currency
+    // values, not visitor-currency-converted ones.
+    private static function is_api_request(): bool {
+        return (defined('GRAPHQL_REQUEST') && GRAPHQL_REQUEST)
+            || (defined('REST_REQUEST') && REST_REQUEST);
     }
 
     public static function currency_symbol(string $symbol, string $currency): string {
@@ -90,6 +80,7 @@ final class HWS_Multicurrency {
             'USD' => '$',
             'UZS' => 'сум',
             'AZN' => '₼',
+            'RUB' => '₽',
         ];
 
         return $symbols[$currency] ?? $symbol;
@@ -120,8 +111,15 @@ final class HWS_Multicurrency {
             return $price;
         }
 
+        // The headless storefront (Next.js) reads raw RUB prices via WPGraphQL/REST and does
+        // its own client-side conversion (see hws-graphql-bridge's hwsPriceCurrency field +
+        // the frontend's CurrencyProvider). Converting here too would double-convert.
+        if (self::is_api_request()) {
+            return $price;
+        }
+
         $currency = self::current_currency();
-        if ($currency === self::BASE) {
+        if ($currency === self::STORAGE_CURRENCY) {
             return $price;
         }
 
@@ -135,7 +133,7 @@ final class HWS_Multicurrency {
 
     public static function variation_prices_hash(array $hash, WC_Product $product, bool $for_display): array {
         $hash['hws_currency'] = self::current_currency();
-        $hash['hws_rates_updated_at'] = self::rates()['updated_at'] ?? '';
+        $hash['hws_rates_updated_at'] = self::rates()['updatedAt'] ?? '';
         return $hash;
     }
 
@@ -210,7 +208,7 @@ final class HWS_Multicurrency {
     private static function currency_switcher_html(string $modifier = ''): string {
         $current = self::current_currency();
         $items = [];
-        foreach (['USD', 'UZS', 'AZN'] as $currency) {
+        foreach (self::enabled_currencies() as $currency) {
             $url = add_query_arg('hws_currency', $currency);
             $class = $currency === $current ? ' is-active' : '';
             $items[] = sprintf(
@@ -241,90 +239,39 @@ final class HWS_Multicurrency {
         self::$currency = match ($country) {
             'UZ' => 'UZS',
             'AZ' => 'AZN',
-            default => self::BASE,
+            default => self::default_display_currency(),
         };
 
         return self::$currency;
     }
 
-    public static function update_rates(): void {
-        $existing = self::rates();
-        $rates = [
-            'USD' => [
-                'rate' => 1.0,
-                'date' => gmdate('Y-m-d'),
-                'source' => 'base',
-            ],
-        ];
-
-        $uzs = self::fetch_uzs_rate();
-        if ($uzs) {
-            $rates['UZS'] = $uzs;
-        } elseif (isset($existing['currencies']['UZS'])) {
-            $rates['UZS'] = $existing['currencies']['UZS'];
+    // Rates and the base/display/enabled-currency settings live in HWS Currency Converter's
+    // admin page (WooCommerce → Конвертер валют) — this plugin only applies them to price
+    // output, it doesn't maintain its own rate source.
+    private static function default_display_currency(): string {
+        if (!class_exists('HWS_Currency_Converter')) {
+            return 'USD';
         }
-
-        $azn = self::fetch_azn_rate();
-        if ($azn) {
-            $rates['AZN'] = $azn;
-        } elseif (isset($existing['currencies']['AZN'])) {
-            $rates['AZN'] = $existing['currencies']['AZN'];
-        }
-
-        update_option(self::OPTION_RATES, [
-            'updated_at' => gmdate('c'),
-            'currencies' => $rates,
-        ], false);
+        $settings = HWS_Currency_Converter::settings();
+        return $settings['display_currency'] ?: 'USD';
     }
 
-    private static function fetch_uzs_rate(): ?array {
-        $response = wp_remote_get('https://cbu.uz/ru/arkhiv-kursov-valyut/json/USD/', ['timeout' => 12]);
-        if (is_wp_error($response)) {
-            return null;
+    private static function enabled_currencies(): array {
+        if (!class_exists('HWS_Currency_Converter')) {
+            return ['USD', 'AZN', 'UZS', 'RUB'];
         }
+        $settings = HWS_Currency_Converter::settings();
+        $enabled = array_values(array_diff((array) $settings['enabled'], [self::STORAGE_CURRENCY]));
+        $enabled[] = self::STORAGE_CURRENCY;
 
-        $body = json_decode(wp_remote_retrieve_body($response), true);
-        if (!is_array($body) || empty($body[0]['Rate'])) {
-            return null;
-        }
-
-        return [
-            'rate' => (float) str_replace(',', '.', $body[0]['Rate']),
-            'date' => isset($body[0]['Date']) ? sanitize_text_field($body[0]['Date']) : gmdate('Y-m-d'),
-            'source' => 'Central Bank of Uzbekistan',
-        ];
+        return $enabled;
     }
 
-    private static function fetch_azn_rate(): ?array {
-        for ($i = 0; $i < 10; $i++) {
-            $timestamp = current_time('timestamp') - ($i * DAY_IN_SECONDS);
-            $date_for_url = gmdate('d.m.Y', $timestamp);
-            $response = wp_remote_get('https://www.cbar.az/currencies/' . $date_for_url . '.xml', ['timeout' => 12]);
-            if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
-                continue;
-            }
-
-            $xml = simplexml_load_string(wp_remote_retrieve_body($response));
-            if (!$xml) {
-                continue;
-            }
-
-            foreach ($xml->ValType as $type) {
-                foreach ($type->Valute as $valute) {
-                    if ((string) $valute['Code'] !== 'USD') {
-                        continue;
-                    }
-
-                    return [
-                        'rate' => (float) str_replace(',', '.', (string) $valute->Value),
-                        'date' => sanitize_text_field((string) $xml['Date']),
-                        'source' => 'Central Bank of Azerbaijan',
-                    ];
-                }
-            }
+    private static function rates(): array {
+        if (!class_exists('HWS_Currency_Converter')) {
+            return [];
         }
-
-        return null;
+        return HWS_Currency_Converter::get_rates();
     }
 
     private static function visitor_country(): string {
@@ -343,7 +290,7 @@ final class HWS_Multicurrency {
     }
 
     private static function is_supported_currency(string $currency): bool {
-        return in_array($currency, ['USD', 'UZS', 'AZN'], true);
+        return in_array($currency, self::enabled_currencies(), true);
     }
 
     private static function set_cookie(string $currency): void {
@@ -362,28 +309,20 @@ final class HWS_Multicurrency {
         $_COOKIE[self::COOKIE] = $currency;
     }
 
+    // HWS_Currency_Converter::get_rates() returns each currency's value expressed as
+    // "units per 1 USD" (USD itself = 1). Prices are stored in RUB, so converting to a
+    // target currency needs a RUB-based multiplier: target-units per 1 RUB =
+    // rates[target] / rates['RUB'].
     private static function rate_for(string $currency): ?float {
         $rates = self::rates();
-        $rate = $rates['currencies'][$currency]['rate'] ?? null;
-
-        return $rate ? (float) $rate : null;
-    }
-
-    private static function rates(): array {
-        $rates = get_option(self::OPTION_RATES, []);
-        return is_array($rates) ? $rates : [];
-    }
-
-    private static function rates_are_fresh(): bool {
-        $rates = self::rates();
-        if (empty($rates['updated_at'])) {
-            return false;
+        $rub = $rates[self::STORAGE_CURRENCY] ?? null;
+        $target = $rates[$currency] ?? null;
+        if (!$rub || !$target) {
+            return null;
         }
 
-        return strtotime($rates['updated_at']) > (time() - DAY_IN_SECONDS);
+        return (float) $target / (float) $rub;
     }
 }
 
 HWS_Multicurrency::init();
-register_activation_hook(__FILE__, ['HWS_Multicurrency', 'activate']);
-register_deactivation_hook(__FILE__, ['HWS_Multicurrency', 'deactivate']);
