@@ -1714,6 +1714,36 @@ final class HWS_Product_Parser {
         $product->save();
     }
 
+    // The real long-form description lives in a "Описание" tab
+    // (<div class="tab-pane" id="desc"><div class="content catalog-detail__detailtext"
+    // itemprop="description">...</div></div>) — separate from, and much richer than, the short
+    // itemprop="description" <meta> tagline used for short_description. It's present in the
+    // static HTML (not JS-injected), but its content nests further divs (the characteristics
+    // block immediately follows as a sibling in some markups), so a hand-rolled regex either
+    // stops too early or swallows unrelated content — DOMDocument/XPath handles the real
+    // element boundary correctly.
+    private static function extract_vvd_full_description(string $html): string {
+        if ($html === '') {
+            return '';
+        }
+        $dom = new DOMDocument();
+        $prev = libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
+        libxml_clear_errors();
+        libxml_use_internal_errors($prev);
+
+        $xpath = new DOMXPath($dom);
+        $nodes = $xpath->query('//div[contains(concat(" ", normalize-space(@class), " "), " catalog-detail__detailtext ")]');
+        if (!$nodes || $nodes->length === 0) {
+            return '';
+        }
+
+        $text = $nodes->item(0)->textContent;
+        $text = preg_replace('~[ \t]+~u', ' ', $text);
+        $text = preg_replace('~\n[ \t]*\n+~u', "\n\n", $text);
+        return trim((string) $text);
+    }
+
     private static function vvd_has_offer_tree(string $html): bool {
         return str_contains($html, 'sku-props__inner');
     }
@@ -1751,7 +1781,7 @@ final class HWS_Product_Parser {
             'price'              => self::extract_price($html),
             'offer_image'        => self::extract_vvd_images($html, 'https://vvd.su/')[0] ?? self::extract_image($html, 'https://vvd.su/'),
             'short_description'  => self::extract_vvd_tagline($html) ?: self::extract_meta_content($html, 'description'),
-            'long_description'   => self::extract_vvd_tagline($html),
+            'long_description'   => self::extract_vvd_full_description($html) ?: self::extract_vvd_tagline($html),
             'characteristics'    => $chars,
             'fuel_type'          => $electric ? 'электричество' : 'дрова',
             'steam_volume'       => self::extract_vvd_steam_volume($html, $chars),
@@ -2461,7 +2491,12 @@ final class HWS_Product_Parser {
                     }
                 }
             }
-            $offers[$oid] = ['oid' => $oid, 'price' => $price, 'props' => $props];
+            $offers[$oid] = [
+                'oid'   => $oid,
+                'price' => $price,
+                'props' => $props,
+                'url'   => self::absolute_url(html_entity_decode($match[2], ENT_QUOTES | ENT_HTML5, 'UTF-8'), 'https://vvd.su/'),
+            ];
         }
 
         return array_values($offers);
@@ -2541,6 +2576,22 @@ final class HWS_Product_Parser {
             }
             if ($variation_post_id <= 0) {
                 $variation->set_parent_id($wc_product_id);
+            }
+
+            // The site itself renders a combo-specific cover photo when you switch options
+            // (e.g. cladding material) — confirmed by comparing the same product's page under
+            // two different ?oid= query strings: only the first gallery image differed, the
+            // rest of the gallery stayed identical. The AJAX combo-matrix response only carries
+            // internal Bitrix numeric file IDs (no resolvable URL), so the reliable way to get
+            // a real per-offer image is a plain GET of the offer's own detail URL.
+            if (!empty($offer['url'])) {
+                $offer_images = self::extract_vvd_images(self::fetch_html($offer['url']), 'https://vvd.su/');
+                if ($offer_images) {
+                    $offer_image_id = self::sideload_offer_image($offer_images[0]);
+                    if ($offer_image_id) {
+                        $variation->set_image_id($offer_image_id);
+                    }
+                }
             }
             $variation->set_sku($sku);
             $variation->set_status('publish');
