@@ -18,7 +18,7 @@ final class HWS_Product_Parser {
     private const MANUFACTURERS = [
         'easysteam' => [
             'label'      => 'EasySteam',
-            'categories' => ['gelendzhik', 'anapa', 'sochi', 'yuzhnaya'],
+            'categories' => ['gelendzhik', 'anapa', 'sochi', 'yuzhnaya', 'vivarte', 'montfort'],
         ],
         'sangens' => [
             'label'      => 'Sangens',
@@ -62,6 +62,24 @@ final class HWS_Product_Parser {
             'url'          => 'https://easysteam.ru/products/stoves/pechi/yuzhnaya',
             'base_url'     => 'https://easysteam.ru/',
             'expected'     => 16,
+        ],
+        'vivarte' => [
+            'manufacturer' => 'easysteam',
+            'label'        => 'Электропечь VIVARTE',
+            'url'          => 'https://easysteam.ru/products/stoves/pechi/elektricheskie-pechi',
+            'base_url'     => 'https://easysteam.ru/',
+            'expected'     => 6,
+        ],
+        'montfort' => [
+            'manufacturer' => 'easysteam',
+            'label'        => 'MONTFORT',
+            // Single-product line: no dedicated category listing page exists on the source,
+            // this "category" URL is the product's own detail page. See the manual state
+            // seed used when parsing this category (extract_category_products can't crawl
+            // a single product page as a listing).
+            'url'          => 'https://easysteam.ru/products/show/7c4c8926-3383-47c7-a3da-451459496f97',
+            'base_url'     => 'https://easysteam.ru/',
+            'expected'     => 1,
         ],
         'sangens-electric-furnaces' => [
             'manufacturer' => 'sangens',
@@ -1749,6 +1767,25 @@ final class HWS_Product_Parser {
      * product page that exposes offer selectors (radio-group blocks). Leaves the product
      * as a simple product when the page has no offers to combine.
      */
+    private static function sync_easysteam_simple_image(int $wc_product_id, array $parsed): void {
+        if ($wc_product_id <= 0 || get_post_type($wc_product_id) !== 'product') {
+            return;
+        }
+        $product = wc_get_product($wc_product_id);
+        if (!$product || $product->get_image_id()) {
+            return;
+        }
+        $url = trim((string) ($parsed['offer_image'] ?? ''));
+        if ($url === '') {
+            return;
+        }
+        $image_id = self::sideload_offer_image($url);
+        if ($image_id) {
+            $product->set_image_id($image_id);
+            $product->save();
+        }
+    }
+
     private static function sync_easysteam_offer_variations(int $wc_product_id, string $product_uuid, string $html, array $parsed): void {
         if ($wc_product_id <= 0 || !class_exists('WC_Product_Variable') || !class_exists('WC_Product_Variation')) {
             return;
@@ -1756,6 +1793,10 @@ final class HWS_Product_Parser {
 
         $groups = self::extract_radio_groups($html);
         if (!$groups) {
+            // No offer selectors on this page — it's a genuinely simple product.
+            // create_store_product()/sync_store_product_core() only ever store the source
+            // image as a URL in postmeta, never download it, so it still needs sideloading.
+            self::sync_easysteam_simple_image($wc_product_id, $parsed);
             return;
         }
 
