@@ -3096,10 +3096,30 @@ final class HWS_Product_Parser {
             }
         }
 
-        $attributes = self::build_product_attributes($parsed);
-        if ($attributes && method_exists($product, 'set_attributes')) {
-            $product->set_attributes($attributes);
-            $changed = true;
+        // WC_Product::set_attributes() replaces the whole attribute set, not just the ones
+        // passed in. Variation-building code (sync_easysteam_offer_variations,
+        // sync_vvd_offer_variations) sets real per-combo variation attributes separately —
+        // any later sync_store_product_core() call (e.g. a single-field re-sync that doesn't
+        // re-run the variation builder) must not blow those away by calling set_attributes()
+        // with only the generic filter attributes below. Preserve existing variation="true"
+        // attributes and skip adding a same-named non-variation duplicate over them.
+        $new_attributes = self::build_product_attributes($parsed);
+        if ($new_attributes && method_exists($product, 'set_attributes')) {
+            $existing = method_exists($product, 'get_attributes') ? $product->get_attributes() : [];
+            $preserved = array_filter(
+                $existing,
+                static fn($attr): bool => $attr instanceof WC_Product_Attribute && $attr->get_variation()
+            );
+            $preserved_names = array_map(static fn(WC_Product_Attribute $attr): string => $attr->get_name(), $preserved);
+            $new_attributes = array_filter(
+                $new_attributes,
+                static fn(WC_Product_Attribute $attr): bool => !in_array($attr->get_name(), $preserved_names, true)
+            );
+            $merged = array_merge($preserved, $new_attributes);
+            if ($merged) {
+                $product->set_attributes($merged);
+                $changed = true;
+            }
         }
 
         if ($changed) {
