@@ -2567,6 +2567,7 @@ final class HWS_Product_Parser {
         $product->set_attributes($wc_attributes);
         $product->save();
 
+        $merged_characteristics = [];
         foreach ($offers as $offer) {
             $sku = 'VVD-' . $offer['oid'];
             $variation_post_id = wc_get_product_id_by_sku($sku);
@@ -2583,15 +2584,21 @@ final class HWS_Product_Parser {
             // two different ?oid= query strings: only the first gallery image differed, the
             // rest of the gallery stayed identical. The AJAX combo-matrix response only carries
             // internal Bitrix numeric file IDs (no resolvable URL), so the reliable way to get
-            // a real per-offer image is a plain GET of the offer's own detail URL.
+            // a real per-offer image is a plain GET of the offer's own detail URL. Each offer's
+            // characteristics page can also carry properties the others don't (e.g. a stainless
+            // steel cladding has no "Вес облицовки" — a stone one does) — union them all onto
+            // the parent below instead of only keeping whichever offer happened to be fetched
+            // for the base product fields.
             if (!empty($offer['url'])) {
-                $offer_images = self::extract_vvd_images(self::fetch_html($offer['url']), 'https://vvd.su/');
+                $offer_html = self::fetch_html($offer['url']);
+                $offer_images = self::extract_vvd_images($offer_html, 'https://vvd.su/');
                 if ($offer_images) {
                     $offer_image_id = self::sideload_offer_image($offer_images[0]);
                     if ($offer_image_id) {
                         $variation->set_image_id($offer_image_id);
                     }
                 }
+                $merged_characteristics = array_merge($merged_characteristics, self::extract_vvd_characteristics($offer_html));
             }
             $variation->set_sku($sku);
             $variation->set_status('publish');
@@ -2619,6 +2626,15 @@ final class HWS_Product_Parser {
             update_post_meta($variation_id, '_hws_source_options', wp_json_encode($options_json, JSON_UNESCAPED_UNICODE));
             update_post_meta($variation_id, '_hws_article_status', 'internal_id_only');
             update_post_meta($variation_id, '_hws_internal_id', $offer['oid']);
+        }
+
+        if ($merged_characteristics) {
+            update_post_meta(
+                $wc_product_id,
+                '_hws_source_characteristics_json',
+                wp_json_encode($merged_characteristics, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            );
+            update_post_meta($wc_product_id, '_hws_specs_html', self::specs_to_html($merged_characteristics));
         }
 
         if (function_exists('wc_delete_product_transients')) {
