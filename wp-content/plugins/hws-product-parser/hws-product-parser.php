@@ -327,6 +327,13 @@ final class HWS_Product_Parser {
         'chimney_side',
     ];
 
+    private const VVD_OPTIONAL_PRODUCT_FIELDS = [
+        'steam_volume',
+        'power',
+        'voltage',
+        'material',
+    ];
+
     private const SANGENS_OPTIONAL_PRODUCT_FIELDS = [
         'short_description',
         'long_description',
@@ -1189,7 +1196,14 @@ final class HWS_Product_Parser {
             }
         }
 
-        if (($manufacturer === 'vvd' || $manufacturer === 'eos' || $manufacturer === 'sangens') && $only_field === null) {
+        if ($manufacturer === 'vvd' && $only_field === null) {
+            $wc_product_id = self::store_product_id($parsed);
+            if ($wc_product_id > 0) {
+                self::sync_vvd_offer_variations($wc_product_id, $html, (string) ($parsed['source_url'] ?? ''), $parsed);
+            }
+        }
+
+        if (($manufacturer === 'eos' || $manufacturer === 'sangens') && $only_field === null) {
             $wc_product_id = self::store_product_id($parsed);
             if ($wc_product_id > 0) {
                 self::sync_easysteam_simple_image($wc_product_id, $parsed);
@@ -1251,6 +1265,13 @@ final class HWS_Product_Parser {
             update_post_meta($product_id, '_hws_source_article', $article);
         }
 
+        if (isset($parsed['_hws_article_status'])) {
+            update_post_meta($product_id, '_hws_article_status', (string) $parsed['_hws_article_status']);
+        }
+        if (!empty($parsed['_hws_internal_id'])) {
+            update_post_meta($product_id, '_hws_internal_id', (string) $parsed['_hws_internal_id']);
+        }
+
         if (in_array('brand', $fields, true) && self::field_is_valid('brand', $parsed['brand'] ?? '')) {
             update_post_meta($product_id, '_hws_source_brand', trim((string) $parsed['brand']));
         }
@@ -1270,6 +1291,18 @@ final class HWS_Product_Parser {
                 '_hws_price_on_request',
                 self::field_is_valid('price', $parsed['price'] ?? '') ? 'no' : 'yes'
             );
+        }
+
+        if (in_array('steam_volume', $fields, true) && self::field_is_valid('steam_volume', $parsed['steam_volume'] ?? '')) {
+            update_post_meta($product_id, '_hws_steam_volume', trim((string) $parsed['steam_volume']));
+        }
+
+        if (in_array('power', $fields, true) && self::field_is_valid('power', $parsed['power'] ?? '')) {
+            update_post_meta($product_id, '_hws_power', trim((string) $parsed['power']));
+        }
+
+        if (in_array('voltage', $fields, true) && self::field_is_valid('voltage', $parsed['voltage'] ?? '')) {
+            update_post_meta($product_id, '_hws_voltage', trim((string) $parsed['voltage']));
         }
 
         if (in_array('characteristics', $fields, true) && self::field_is_valid('characteristics', $parsed['characteristics'] ?? [])) {
@@ -1513,7 +1546,10 @@ final class HWS_Product_Parser {
         if ($manufacturer === 'sangens') {
             return self::extract_sangens_product_fields($html, $source_url);
         }
-        if ($manufacturer === 'eos' || $manufacturer === 'vvd') {
+        if ($manufacturer === 'vvd') {
+            return self::extract_vvd_product_fields($html, $source_url);
+        }
+        if ($manufacturer === 'eos') {
             return self::extract_generic_manufacturer_product_fields($html, $manufacturer, $source_url);
         }
 
@@ -1541,6 +1577,79 @@ final class HWS_Product_Parser {
             'door_side'         => self::normalize_side(self::first_present($options, $chars, ['Исполнение дверки', 'Сторона дверки'])),
             'stone_side'        => self::normalize_side(self::first_present($options, $chars, ['Боковой вход в каменку'])),
             'chimney_side'      => self::normalize_side(self::first_present($options, $chars, ['Боковое подключение дымохода'])),
+        ];
+    }
+
+    private static function extract_vvd_internal_id(string $html): string {
+        if (preg_match('~itemprop=["\']sku["\']\s+content=["\']([^"\']+)["\']~isu', $html, $m)) {
+            return trim($m[1]);
+        }
+        if (preg_match('~itemprop=["\']offers["\'][^>]*data-id=["\'](\d+)["\']~isu', $html, $m)) {
+            return trim($m[1]);
+        }
+        return '';
+    }
+
+    private static function extract_vvd_steam_volume(string $html, array $chars): string {
+        foreach ($chars as $value) {
+            if (is_string($value) && preg_match('~(\d{1,3}\s*-\s*\d{1,3})\s*м³~u', $value, $m)) {
+                return preg_replace('~\s+~u', '', $m[1]) . ' м³';
+            }
+        }
+        $text = wp_strip_all_tags($html);
+        if (preg_match('~[Оо]бъ[её]м\s+парильного\s+помещения[^\d]{0,60}(\d{1,3}(?:\s*-\s*\d{1,3})?)\s*м³~u', $text, $m)) {
+            return preg_replace('~\s+~u', '', $m[1]) . ' м³';
+        }
+        return '';
+    }
+
+    private static function vvd_has_offer_tree(string $html): bool {
+        return str_contains($html, 'sku-props__inner');
+    }
+
+    private static function extract_vvd_product_fields(string $html, string $source_url): array {
+        $chars = self::extract_characteristics($html);
+        $options = self::extract_options($html);
+        $electric = str_contains($source_url, 'elektricheskie');
+        $title = self::extract_first_text($html, [
+            '~<h1[^>]*>(.*?)</h1>~isu',
+            '~<title[^>]*>(.*?)</title>~isu',
+        ]);
+        $internal_id = self::extract_vvd_internal_id($html);
+        $article = $internal_id !== '' ? 'VVD-' . $internal_id : '';
+        $power = self::first_present($options, $chars, ['Номинальная потребляемая мощность', 'Мощность']);
+        if (!preg_match('~^\d+(?:[.,]\d+)?(?:\s*[-;/]\s*\d+(?:[.,]\d+)?)*\s*кВт~iu', trim($power))) {
+            $power = '';
+        }
+        if ($power === '' && preg_match('~(\d+(?:[.,]\d+)?)\s*кВт~iu', wp_strip_all_tags($html), $m)) {
+            $power = $m[1] . ' кВт';
+        }
+        $voltage = $electric
+            ? self::first_present($options, $chars, ['Номинальное напряжение', 'Напряжение'])
+            : '';
+        if ($electric && $voltage === '' && preg_match('~\b(220/380|220|380)\s*В\b~u', wp_strip_all_tags($html), $m)) {
+            $voltage = $m[1] . ' В';
+        }
+        $material = self::first_present($options, $chars, ['Материал', 'Облицовочный материал', 'Облицовка']);
+
+        return [
+            'brand'              => 'ВВД',
+            'source_url'         => $source_url,
+            'title'              => $title,
+            'article'            => $article,
+            'price'              => self::extract_price($html),
+            'offer_image'        => self::extract_image($html, 'https://vvd.su/'),
+            'short_description'  => self::extract_meta_content($html, 'description'),
+            'long_description'   => self::extract_meta_content($html, 'description'),
+            'characteristics'    => $chars,
+            'fuel_type'          => $electric ? 'электричество' : 'дрова',
+            'steam_volume'       => self::extract_vvd_steam_volume($html, $chars),
+            'power'              => $power,
+            'voltage'            => $voltage,
+            'material'           => $material,
+            'hws_category_slug'  => $electric ? 'sauna-stoves' : 'russian-bath-stoves',
+            '_hws_internal_id'   => $internal_id,
+            '_hws_article_status' => $article === '' ? 'not_found_in_source' : 'internal_id_only',
         ];
     }
 
@@ -2136,6 +2245,230 @@ final class HWS_Product_Parser {
         clean_post_cache($wc_product_id);
     }
 
+    private static function extract_vvd_sku_props(string $html): array {
+        $props = [];
+        if (!preg_match_all('~<div class="line-block__item sku-props__inner"[^>]*data-id="(\d+)">(.*?)</div>\s*</div>\s*</div>~isu', $html, $blocks, PREG_SET_ORDER)) {
+            return $props;
+        }
+        foreach ($blocks as $block) {
+            $prop_id = $block[1];
+            $chunk = $block[2];
+            if (!preg_match('~sku-props__title[^>]*>\s*([^<]+?)\s*(?:<span|</div)~isu', $chunk, $title_match)) {
+                continue;
+            }
+            $title = trim((string) preg_replace('~\s+~u', ' ', $title_match[1]), " :\t\n\r");
+            $options = [];
+            if (preg_match_all('~data-onevalue="(\d+)"\s+data-title="([^"]+)"~isu', $chunk, $value_matches, PREG_SET_ORDER)) {
+                foreach ($value_matches as $vm) {
+                    $options[$vm[1]] = html_entity_decode($vm[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                }
+            }
+            if ($options) {
+                $props[$prop_id] = ['title' => $title, 'options' => $options];
+            }
+        }
+        return $props;
+    }
+
+    private static function vvd_fetch_offer_matrix(string $html, string $source_url): array {
+        if (!preg_match('~js-sku-config"\s+data-value=[\'"](\{.*?\})[\'"]>~su', $html, $pm)) {
+            return [];
+        }
+        if (!preg_match('~data-btn-config=[\'"](\{.*?\})[\'"]~su', $html, $bm)) {
+            return [];
+        }
+        $params = json_decode(html_entity_decode($pm[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), true);
+        $basket = json_decode(html_entity_decode($bm[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), true);
+        $internal_id = self::extract_vvd_internal_id($html);
+        if (!is_array($params) || !is_array($basket) || $internal_id === '') {
+            return [];
+        }
+
+        $iblock_id = (int) ($basket['CATALOG_IBLOCK_ID'] ?? 47);
+        $payload = wp_json_encode([
+            'PARAMS'          => $params,
+            'BASKET_PARAMS'   => $basket,
+            'ID'              => (int) $internal_id,
+            'OFFER_ID'        => (int) $internal_id,
+            'SITE_ID'         => 's1',
+            'IBLOCK_ID'       => $iblock_id,
+            'SKU_IBLOCK_ID'   => 25,
+            'DEPTH'           => 0,
+            'SHOW_GALLERY'    => 'N',
+            'MAX_GALLERY_ITEMS' => '5',
+            'OID'             => 'oid',
+            'IS_DETAIL'       => 'Y',
+        ]);
+
+        $response = wp_remote_post('https://vvd.su/ajax/js_item_detail.php', [
+            'headers' => [
+                'Content-Type'     => 'application/json',
+                'X-Requested-With' => 'XMLHttpRequest',
+                'Referer'          => $source_url,
+            ],
+            'body'    => $payload,
+            'timeout' => 30,
+        ]);
+        if (is_wp_error($response)) {
+            return [];
+        }
+        $body = (string) wp_remote_retrieve_body($response);
+        if ($body === '') {
+            return [];
+        }
+
+        if (!preg_match_all(
+            '~\'TREE\':(\{[^}]*\}).*?\'DETAIL_PAGE_URL\':\'([^\']*)\'.*?\'PRICES_HTML\':\'(.*?)\',(?:\'|BASKET)~su',
+            $body,
+            $matches,
+            PREG_SET_ORDER
+        )) {
+            return [];
+        }
+
+        $offers = [];
+        foreach ($matches as $match) {
+            if (!preg_match('~oid=(\d+)~', $match[2], $oid_match)) {
+                continue;
+            }
+            $oid = $oid_match[1];
+            if (isset($offers[$oid])) {
+                continue;
+            }
+            if (!preg_match('~([\d\x{00A0}\s]{3,})\s*&#8381;~u', $match[3], $price_match)) {
+                continue;
+            }
+            $price = (int) preg_replace('~\D~u', '', $price_match[1]);
+            if ($price <= 0) {
+                continue;
+            }
+            $props = [];
+            if (preg_match_all('~\'PROP_(\d+)\':\'([^\']*)\'~u', $match[1], $prop_matches, PREG_SET_ORDER)) {
+                foreach ($prop_matches as $pmatch) {
+                    if ($pmatch[2] !== '' && $pmatch[2] !== '—') {
+                        $props[$pmatch[1]] = $pmatch[2];
+                    }
+                }
+            }
+            $offers[$oid] = ['oid' => $oid, 'price' => $price, 'props' => $props];
+        }
+
+        return array_values($offers);
+    }
+
+    private static function sync_vvd_offer_variations(int $wc_product_id, string $html, string $source_url, array $parsed): void {
+        if ($wc_product_id <= 0 || !class_exists('WC_Product_Variable') || !class_exists('WC_Product_Variation')) {
+            return;
+        }
+        if (!self::vvd_has_offer_tree($html)) {
+            self::sync_easysteam_simple_image($wc_product_id, $parsed);
+            return;
+        }
+
+        $props  = self::extract_vvd_sku_props($html);
+        $offers = self::vvd_fetch_offer_matrix($html, $source_url);
+        if (!$props || !$offers) {
+            self::sync_easysteam_simple_image($wc_product_id, $parsed);
+            return;
+        }
+
+        // Only build a WooCommerce attribute for properties that actually vary across
+        // offers — a prop present in the tree but constant across every combo (e.g. a
+        // colour selector with one option) isn't a real variation axis.
+        $varying_prop_ids = [];
+        foreach (array_keys($props) as $prop_id) {
+            $seen = [];
+            foreach ($offers as $offer) {
+                $seen[$offer['props'][$prop_id] ?? ''] = true;
+            }
+            if (count($seen) > 1) {
+                $varying_prop_ids[] = $prop_id;
+            }
+        }
+        if (!$varying_prop_ids) {
+            self::sync_easysteam_simple_image($wc_product_id, $parsed);
+            return;
+        }
+
+        if (get_post_type($wc_product_id) !== 'product') {
+            return;
+        }
+        if (wc_get_product($wc_product_id)?->get_type() !== 'variable') {
+            wp_set_object_terms($wc_product_id, 'variable', 'product_type');
+            clean_post_cache($wc_product_id);
+        }
+        $product = new WC_Product_Variable($wc_product_id);
+        if (!$product->get_id()) {
+            return;
+        }
+
+        $wc_attributes = [];
+        foreach ($varying_prop_ids as $prop_id) {
+            $attribute = new WC_Product_Attribute();
+            $attribute->set_name($props[$prop_id]['title']);
+            $attribute->set_options(array_values($props[$prop_id]['options']));
+            $attribute->set_visible(true);
+            $attribute->set_variation(true);
+            $wc_attributes[] = $attribute;
+        }
+        $product->set_attributes($wc_attributes);
+        $product->save();
+
+        $first_image_id = 0;
+        $base_image_url = trim((string) ($parsed['offer_image'] ?? ''));
+
+        foreach ($offers as $offer) {
+            $sku = 'VVD-' . $offer['oid'];
+            $variation_post_id = wc_get_product_id_by_sku($sku);
+            $variation = $variation_post_id > 0 ? wc_get_product($variation_post_id) : new WC_Product_Variation();
+            if (!$variation instanceof WC_Product_Variation) {
+                continue;
+            }
+            if ($variation_post_id <= 0) {
+                $variation->set_parent_id($wc_product_id);
+            }
+            $variation->set_sku($sku);
+            $variation->set_status('publish');
+            $variation->set_regular_price((string) $offer['price']);
+            $variation->set_manage_stock(false);
+            $variation->set_stock_status('instock');
+
+            $attr_values = [];
+            $options_json = [];
+            foreach ($varying_prop_ids as $prop_id) {
+                $value_id = $offer['props'][$prop_id] ?? '';
+                $label = $props[$prop_id]['options'][$value_id] ?? '';
+                if ($label === '') {
+                    continue;
+                }
+                $attr_values[sanitize_title($props[$prop_id]['title'])] = sanitize_title($label);
+                $options_json[$props[$prop_id]['title']] = $label;
+            }
+            $variation->set_attributes($attr_values);
+            $variation_id = $variation->save();
+
+            update_post_meta($variation_id, '_hws_source_price_rub', $offer['price']);
+            update_post_meta($variation_id, '_hws_price_currency', 'RUB');
+            update_post_meta($variation_id, '_hws_price_mode', 'source-rub');
+            update_post_meta($variation_id, '_hws_source_options', wp_json_encode($options_json, JSON_UNESCAPED_UNICODE));
+            update_post_meta($variation_id, '_hws_article_status', 'internal_id_only');
+            update_post_meta($variation_id, '_hws_internal_id', $offer['oid']);
+        }
+
+        if (!$product->get_image_id() && $base_image_url !== '') {
+            $image_id = self::sideload_offer_image($base_image_url);
+            if ($image_id) {
+                $product->set_image_id($image_id);
+                $product->save();
+            }
+        }
+
+        if (function_exists('wc_delete_product_transients')) {
+            wc_delete_product_transients($wc_product_id);
+        }
+        clean_post_cache($wc_product_id);
+    }
+
     private static function extract_price(string $html): string {
         if (preg_match('~data-product-offer-price=["\']([^"\']+)["\']~isu', $html, $match)) {
             return trim($match[1]);
@@ -2144,7 +2477,8 @@ final class HWS_Product_Parser {
             return trim($match[1]);
         }
         if (preg_match('~class=["\'][^"\']*price[^"\']*["\'][^>]*>(.*?)</~isu', $html, $match)) {
-            return trim((string) preg_replace('~[^\d.,]~u', '', wp_strip_all_tags($match[1])), '.,');
+            $decoded = html_entity_decode(wp_strip_all_tags($match[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            return trim((string) preg_replace('~[^\d.,]~u', '', $decoded), '.,');
         }
         return '';
     }
@@ -2484,7 +2818,13 @@ final class HWS_Product_Parser {
     }
 
     private static function optional_product_fields(string $manufacturer): array {
-        return $manufacturer === 'sangens' ? self::SANGENS_OPTIONAL_PRODUCT_FIELDS : self::OPTIONAL_PRODUCT_FIELDS;
+        if ($manufacturer === 'sangens') {
+            return self::SANGENS_OPTIONAL_PRODUCT_FIELDS;
+        }
+        if ($manufacturer === 'vvd') {
+            return self::VVD_OPTIONAL_PRODUCT_FIELDS;
+        }
+        return self::OPTIONAL_PRODUCT_FIELDS;
     }
 
     private static function product_status(string $manufacturer, string $category, string $product_id): array {
