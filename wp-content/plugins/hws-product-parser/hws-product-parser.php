@@ -18,7 +18,7 @@ final class HWS_Product_Parser {
     private const MANUFACTURERS = [
         'easysteam' => [
             'label'      => 'EasySteam',
-            'categories' => ['gelendzhik', 'anapa', 'sochi', 'yuzhnaya', 'vivarte', 'montfort'],
+            'categories' => ['gelendzhik', 'anapa', 'sochi', 'yuzhnaya', 'vivarte', 'montfort', 'yalta-15', 'yalta-25', 'yalta-35', 'yalta-40'],
         ],
         'sangens' => [
             'label'      => 'Sangens',
@@ -80,6 +80,34 @@ final class HWS_Product_Parser {
             'url'          => 'https://easysteam.ru/products/show/7c4c8926-3383-47c7-a3da-451459496f97',
             'base_url'     => 'https://easysteam.ru/',
             'expected'     => 1,
+        ],
+        'yalta-15' => [
+            'manufacturer' => 'easysteam',
+            'label'        => 'Ялта 15',
+            'url'          => 'https://easysteam.ru/products/category/yalta-15',
+            'base_url'     => 'https://easysteam.ru/',
+            'expected'     => 2,
+        ],
+        'yalta-25' => [
+            'manufacturer' => 'easysteam',
+            'label'        => 'Ялта 25',
+            'url'          => 'https://easysteam.ru/products/category/yalta-25',
+            'base_url'     => 'https://easysteam.ru/',
+            'expected'     => 2,
+        ],
+        'yalta-35' => [
+            'manufacturer' => 'easysteam',
+            'label'        => 'Ялта 35',
+            'url'          => 'https://easysteam.ru/products/category/yalta-35',
+            'base_url'     => 'https://easysteam.ru/',
+            'expected'     => 2,
+        ],
+        'yalta-40' => [
+            'manufacturer' => 'easysteam',
+            'label'        => 'Ялта 40',
+            'url'          => 'https://easysteam.ru/products/category/yalta-40',
+            'base_url'     => 'https://easysteam.ru/',
+            'expected'     => 2,
         ],
         'sangens-electric-furnaces' => [
             'manufacturer' => 'sangens',
