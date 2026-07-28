@@ -1664,6 +1664,56 @@ final class HWS_Product_Parser {
         return '';
     }
 
+    // extract_image()'s first check is <meta property="og:image">, which on vvd.su is a
+    // site-wide social-share banner (same file — /upload/CAllcorp3/.../....png — on every
+    // page, confirmed shared across 54 unrelated VVD products), never the actual product
+    // photo. The real photos live in the page's own gallery: <a href="/upload/iblock/.../x.jpg"
+    // class="...catalog-detail__gallery__link...">. Returns absolute URLs, first = cover.
+    private static function extract_vvd_images(string $html, string $base_url): array {
+        if (!preg_match_all(
+            '~<a\s+href=["\'](/upload/iblock/[^"\']+)["\'][^>]*class=["\'][^"\']*catalog-detail__gallery__link[^"\']*["\']~isu',
+            $html,
+            $matches
+        )) {
+            return [];
+        }
+        $urls = [];
+        foreach (array_unique($matches[1]) as $path) {
+            $urls[] = self::absolute_url(html_entity_decode($path, ENT_QUOTES | ENT_HTML5, 'UTF-8'), $base_url);
+        }
+        return array_slice($urls, 0, 10);
+    }
+
+    // Sideloads the cover photo + gallery for a VVD product. Runs for both simple and variable
+    // products (image handling is independent of whether the card has an offer tree) — called
+    // once up front from sync_vvd_offer_variations() rather than duplicated per product type.
+    private static function sync_vvd_images(int $wc_product_id, array $image_urls): void {
+        if ($wc_product_id <= 0 || !$image_urls) {
+            return;
+        }
+        $product = wc_get_product($wc_product_id);
+        if (!$product) {
+            return;
+        }
+
+        $image_ids = [];
+        foreach ($image_urls as $url) {
+            $id = self::sideload_offer_image($url);
+            if ($id) {
+                $image_ids[] = $id;
+            }
+        }
+        if (!$image_ids) {
+            return;
+        }
+
+        $product->set_image_id($image_ids[0]);
+        if (count($image_ids) > 1) {
+            $product->set_gallery_image_ids(array_slice($image_ids, 1));
+        }
+        $product->save();
+    }
+
     private static function vvd_has_offer_tree(string $html): bool {
         return str_contains($html, 'sku-props__inner');
     }
@@ -1699,7 +1749,7 @@ final class HWS_Product_Parser {
             'title'              => $title,
             'article'            => $article,
             'price'              => self::extract_price($html),
-            'offer_image'        => self::extract_image($html, 'https://vvd.su/'),
+            'offer_image'        => self::extract_vvd_images($html, 'https://vvd.su/')[0] ?? self::extract_image($html, 'https://vvd.su/'),
             'short_description'  => self::extract_vvd_tagline($html) ?: self::extract_meta_content($html, 'description'),
             'long_description'   => self::extract_vvd_tagline($html),
             'characteristics'    => $chars,
@@ -2421,15 +2471,23 @@ final class HWS_Product_Parser {
         if ($wc_product_id <= 0 || !class_exists('WC_Product_Variable') || !class_exists('WC_Product_Variation')) {
             return;
         }
-        if (!self::vvd_has_offer_tree($html)) {
+
+        $image_urls = self::extract_vvd_images($html, 'https://vvd.su/');
+        if ($image_urls) {
+            self::sync_vvd_images($wc_product_id, $image_urls);
+        } elseif (!empty($parsed['offer_image'])) {
+            // No real gallery found on this page — fall back to whatever extract_image()
+            // guessed (still better than nothing, though likely a shared site banner).
             self::sync_easysteam_simple_image($wc_product_id, $parsed);
+        }
+
+        if (!self::vvd_has_offer_tree($html)) {
             return;
         }
 
         $props  = self::extract_vvd_sku_props($html);
         $offers = self::vvd_fetch_offer_matrix($html, $source_url);
         if (!$props || !$offers) {
-            self::sync_easysteam_simple_image($wc_product_id, $parsed);
             return;
         }
 
@@ -2447,7 +2505,6 @@ final class HWS_Product_Parser {
             }
         }
         if (!$varying_prop_ids) {
-            self::sync_easysteam_simple_image($wc_product_id, $parsed);
             return;
         }
 
@@ -2474,9 +2531,6 @@ final class HWS_Product_Parser {
         }
         $product->set_attributes($wc_attributes);
         $product->save();
-
-        $first_image_id = 0;
-        $base_image_url = trim((string) ($parsed['offer_image'] ?? ''));
 
         foreach ($offers as $offer) {
             $sku = 'VVD-' . $offer['oid'];
@@ -2514,14 +2568,6 @@ final class HWS_Product_Parser {
             update_post_meta($variation_id, '_hws_source_options', wp_json_encode($options_json, JSON_UNESCAPED_UNICODE));
             update_post_meta($variation_id, '_hws_article_status', 'internal_id_only');
             update_post_meta($variation_id, '_hws_internal_id', $offer['oid']);
-        }
-
-        if (!$product->get_image_id() && $base_image_url !== '') {
-            $image_id = self::sideload_offer_image($base_image_url);
-            if ($image_id) {
-                $product->set_image_id($image_id);
-                $product->save();
-            }
         }
 
         if (function_exists('wc_delete_product_transients')) {
