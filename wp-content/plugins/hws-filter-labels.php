@@ -150,6 +150,15 @@ final class HWS_Catalog_Filters {
             'hide_empty' => false,
             'orderby'    => 'name',
         ]);
+
+        // Computed once — same list for every category card, and cheap enough (reads the
+        // handful of registered wc attribute taxonomies) that there's no need to defer it
+        // behind an AJAX call the admin has to know to trigger.
+        $all_attrs = self::global_product_attributes();
+        $all_attrs_by_slug = [];
+        foreach ($all_attrs as $attr) {
+            $all_attrs_by_slug[$attr['slug']] = $attr['label'];
+        }
         ?>
         <div class="wrap" style="max-width:1000px">
             <h1>Фильтры каталога</h1>
@@ -157,10 +166,12 @@ final class HWS_Catalog_Filters {
             <?php if (!is_wp_error($cats)) foreach ($cats as $cat):
                 $saved = $config[(string) $cat->term_id] ?? [];
                 $saved_count = count($saved);
+                $active_slugs = array_column($saved, 'slug');
             ?>
             <div class="hws-cat-card"
                  data-cat-id="<?php echo (int) $cat->term_id; ?>"
                  data-saved='<?php echo wp_json_encode($saved); ?>'
+                 data-all-attrs='<?php echo wp_json_encode($all_attrs); ?>'
                  style="background:#fff;border:1px solid #ddd;border-radius:4px;padding:16px;margin-bottom:12px">
 
                 <!-- Header -->
@@ -170,19 +181,30 @@ final class HWS_Catalog_Filters {
                     <span class="hws-saved-indicator" style="font-size:12px;color:<?php echo $saved_count ? '#2a7e2e' : '#999'; ?>">
                         <?php echo $saved_count ? "✓ $saved_count фильтров" : 'не настроено'; ?>
                     </span>
+                    <button class="button hws-load-attrs" type="button" style="margin-left:auto">Обновить список атрибутов</button>
                 </div>
 
-                <!-- Load button -->
-                <button class="button hws-load-attrs" type="button" style="margin-bottom:12px">Загрузить атрибуты</button>
-
-                <!-- Two-panel editor (hidden until attrs loaded) -->
-                <div class="hws-editor" style="display:none;gap:24px;align-items:flex-start">
+                <!-- Two-panel editor: rendered server-side so the current config is visible
+                     immediately, no click required to see or edit what's active. -->
+                <div class="hws-editor" style="display:flex;gap:24px;align-items:flex-start">
 
                     <!-- Available attrs -->
                     <div style="flex:1;min-width:200px">
                         <div style="font-weight:600;font-size:13px;margin-bottom:8px;color:#555">Доступные атрибуты</div>
                         <div class="hws-available" style="border:1px solid #ddd;border-radius:4px;padding:8px;min-height:80px;display:flex;flex-direction:column;gap:4px">
-                            <!-- populated by JS -->
+                            <?php
+                            $has_available = false;
+                            foreach ($all_attrs as $attr):
+                                if (in_array($attr['slug'], $active_slugs, true)) continue;
+                                $has_available = true;
+                            ?>
+                                <button class="hws-attr-chip is-available" type="button" data-slug="<?php echo esc_attr($attr['slug']); ?>" data-label="<?php echo esc_attr($attr['label']); ?>">
+                                    + <?php echo esc_html($attr['label']); ?> <small style="opacity:.6">(<?php echo esc_html($attr['slug']); ?>)</small>
+                                </button>
+                            <?php endforeach; ?>
+                            <?php if (!$has_available): ?>
+                                <span style="color:#999;font-size:13px">Все атрибуты добавлены</span>
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -190,7 +212,23 @@ final class HWS_Catalog_Filters {
                     <div style="flex:1;min-width:200px">
                         <div style="font-weight:600;font-size:13px;margin-bottom:8px;color:#555">Активные фильтры</div>
                         <div class="hws-active" style="border:1px solid #ddd;border-radius:4px;padding:8px;min-height:80px;display:flex;flex-direction:column;gap:6px">
-                            <!-- populated by JS -->
+                            <?php if (!$saved): ?>
+                                <span style="color:#999;font-size:13px">Нет активных фильтров</span>
+                            <?php endif; ?>
+                            <?php foreach ($saved as $filter):
+                                $slug = $filter['slug'] ?? '';
+                                $type = $filter['type'] ?? 'multicheck';
+                                $label = $all_attrs_by_slug[$slug] ?? self::attribute_label($slug, $slug);
+                            ?>
+                                <div class="hws-active-row" data-slug="<?php echo esc_attr($slug); ?>">
+                                    <span style="font-size:13px;flex:1"><?php echo esc_html($label . ' (' . $slug . ')'); ?></span>
+                                    <select class="hws-type-sel">
+                                        <option value="multicheck" <?php selected($type, 'multicheck'); ?>>Мультивыбор</option>
+                                        <option value="input" <?php selected($type, 'input'); ?>>Ввод текста/числа</option>
+                                    </select>
+                                    <button class="hws-remove" type="button" title="Удалить">×</button>
+                                </div>
+                            <?php endforeach; ?>
                         </div>
                     </div>
 
