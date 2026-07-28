@@ -1189,6 +1189,13 @@ final class HWS_Product_Parser {
             }
         }
 
+        if (($manufacturer === 'vvd' || $manufacturer === 'eos' || $manufacturer === 'sangens') && $only_field === null) {
+            $wc_product_id = self::store_product_id($parsed);
+            if ($wc_product_id > 0) {
+                self::sync_easysteam_simple_image($wc_product_id, $parsed);
+            }
+        }
+
         foreach ($fields as $field) {
             self::mark_status(
                 self::status_key('field', $manufacturer, $category, $product_id, $field),
@@ -1330,7 +1337,7 @@ final class HWS_Product_Parser {
         $root = $category === 'vvd-electric-furnaces'
             ? '/product/elektricheskie-pechi-dlya-bani/'
             : '/product/drovyanye-pechi-dlya-bani-i-sauny/';
-        $blocked = ['pulty-', 'dymokhod', 'obliv', 'dopolnit', 'nebulayzer', 'filter', 'clear', 'dvertsy-topochnogo-tonelya'];
+        $blocked = ['pulty-', 'dymokhod', 'obliv', 'dopolnit', 'nebulayzer', 'filter', 'clear', 'dvertsy-topochnogo-tonelya', 'komplektuyushchie', 'dop-tovary', 'perekrytie'];
 
         $level1 = self::extract_vvd_links_one_level($html, $root, $blocked);
 
