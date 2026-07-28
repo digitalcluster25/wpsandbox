@@ -18,7 +18,7 @@ final class HWS_Product_Parser {
     private const MANUFACTURERS = [
         'easysteam' => [
             'label'      => 'EasySteam',
-            'categories' => ['gelendzhik', 'anapa', 'sochi', 'yuzhnaya', 'vivarte', 'montfort', 'yalta-15', 'yalta-25', 'yalta-35', 'yalta-40', 'anapa-k', 'sochi-k', 'gelendzhik-k'],
+            'categories' => ['gelendzhik', 'anapa', 'sochi', 'yuzhnaya', 'vivarte', 'montfort', 'yalta-15', 'yalta-25', 'yalta-35', 'yalta-40', 'anapa-k', 'sochi-k', 'gelendzhik-k', 'domna-45-k', 'domna-60-k', 'domna-80-k', 'domna-90-tvin-k', 'domna-120-tvin-k'],
         ],
         'sangens' => [
             'label'      => 'Sangens',
@@ -129,6 +129,43 @@ final class HWS_Product_Parser {
             'url'          => 'https://easysteam.ru/products/category/gelendzhik-k',
             'base_url'     => 'https://easysteam.ru/',
             'expected'     => 4,
+        ],
+        'domna-45-k' => [
+            'manufacturer' => 'easysteam',
+            'label'        => 'Домна 45 К',
+            'url'          => 'https://easysteam.ru/products/category/domna-45-k',
+            'base_url'     => 'https://easysteam.ru/',
+            'expected'     => 4,
+        ],
+        'domna-60-k' => [
+            'manufacturer' => 'easysteam',
+            'label'        => 'Домна 60 К',
+            'url'          => 'https://easysteam.ru/products/category/domna-60-k',
+            'base_url'     => 'https://easysteam.ru/',
+            'expected'     => 4,
+        ],
+        'domna-80-k' => [
+            'manufacturer' => 'easysteam',
+            'label'        => 'Домна 80 К',
+            'url'          => 'https://easysteam.ru/products/category/domna-80-k',
+            'base_url'     => 'https://easysteam.ru/',
+            'expected'     => 2,
+        ],
+        'domna-90-tvin-k' => [
+            'manufacturer' => 'easysteam',
+            'label'        => 'Домна 90 К ТВИН',
+            // Single-product line, no dedicated listing page — see MONTFORT for the manual
+            // state-seed pattern this requires.
+            'url'          => 'https://easysteam.ru/products/show/6620e428-83e6-49d6-a6a5-9bf104a740b3',
+            'base_url'     => 'https://easysteam.ru/',
+            'expected'     => 1,
+        ],
+        'domna-120-tvin-k' => [
+            'manufacturer' => 'easysteam',
+            'label'        => 'Домна 120 К ТВИН',
+            'url'          => 'https://easysteam.ru/products/show/d593f90a-2997-447c-a86c-b9a340786846',
+            'base_url'     => 'https://easysteam.ru/',
+            'expected'     => 1,
         ],
         'sangens-electric-furnaces' => [
             'manufacturer' => 'sangens',
@@ -256,6 +293,7 @@ final class HWS_Product_Parser {
         'Варианты дверки' => 'door-side',
         'Защита топки' => 'firebox-protection',
         'Вид топлива' => 'fuel-type',
+        'Виды топлива' => 'fuel-type',
         'Тип топлива' => 'fuel-type',
         'Марка стали' => 'steel-grade',
         'Боковой вход в каменку' => 'stone-entry-side',
