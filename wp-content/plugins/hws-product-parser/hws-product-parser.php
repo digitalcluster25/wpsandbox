@@ -332,6 +332,7 @@ final class HWS_Product_Parser {
         'power',
         'voltage',
         'material',
+        'characteristics',
     ];
 
     private const SANGENS_OPTIONAL_PRODUCT_FIELDS = [
@@ -1590,7 +1591,38 @@ final class HWS_Product_Parser {
         return '';
     }
 
+    // vvd.su renders its spec block as `.properties__item` divs (title/value pair), not an
+    // HTML table — the shared extract_characteristics() only matches <table> markup and
+    // EasySteam-specific class names, so it finds nothing here. Bitrix pads short lists with
+    // literal "#PROP_TITLE#/#PROP_VALUE#" placeholder rows when the template has more slots
+    // than the product has properties — those are filtered out.
+    private static function extract_vvd_characteristics(string $html): array {
+        $result = [];
+        if (!preg_match_all(
+            '~<div[^>]*class=["\'][^"\']*properties__title[^"\']*["\'][^>]*>(.*?)</div>[\s\S]*?<div[^>]*class=["\'][^"\']*properties__value[^"\']*["\'][^>]*>(.*?)</div>~isu',
+            $html,
+            $matches,
+            PREG_SET_ORDER
+        )) {
+            return $result;
+        }
+        foreach ($matches as $match) {
+            $key = trim((string) preg_replace('~\s+~u', ' ', wp_strip_all_tags($match[1])));
+            $val = trim((string) preg_replace('~\s+~u', ' ', wp_strip_all_tags($match[2])));
+            if ($key === '' || $val === '' || str_contains($key, '#') || str_contains($val, '#')) {
+                continue;
+            }
+            $result[$key] = $val;
+        }
+        return $result;
+    }
+
     private static function extract_vvd_steam_volume(string $html, array $chars): string {
+        foreach ($chars as $key => $value) {
+            if (str_contains($key, 'парного помещения') || str_contains($key, 'парильного')) {
+                return trim(str_replace(' ', '', $value));
+            }
+        }
         foreach ($chars as $value) {
             if (is_string($value) && preg_match('~(\d{1,3}\s*-\s*\d{1,3})\s*м³~u', $value, $m)) {
                 return preg_replace('~\s+~u', '', $m[1]) . ' м³';
@@ -1608,7 +1640,7 @@ final class HWS_Product_Parser {
     }
 
     private static function extract_vvd_product_fields(string $html, string $source_url): array {
-        $chars = self::extract_characteristics($html);
+        $chars = self::extract_vvd_characteristics($html);
         $options = self::extract_options($html);
         $electric = str_contains($source_url, 'elektricheskie');
         $title = self::extract_first_text($html, [
