@@ -333,6 +333,7 @@ final class HWS_Product_Parser {
         'voltage',
         'material',
         'characteristics',
+        'long_description',
     ];
 
     private const SANGENS_OPTIONAL_PRODUCT_FIELDS = [
@@ -1635,6 +1636,34 @@ final class HWS_Product_Parser {
         return '';
     }
 
+    // hws-graphql-bridge exposes variant option slugs via its own hws_graphql_bridge_slugify()
+    // (Cyrillic-transliterating, e.g. "20 кВт" -> "20-kvt"). The frontend matches WooCommerce
+    // variation attribute values against those slugs to find the exact price for a selected
+    // combo (see buildVariantEntries() in lib/wp/mappers.ts) — plain sanitize_title() keeps
+    // Cyrillic as-is ("20-квт") and never matches, silently breaking price-on-select. Reuse the
+    // bridge's own transliteration when available so both sides produce identical slugs.
+    private static function hws_bridge_slugify(string $value): string {
+        if (function_exists('hws_graphql_bridge_slugify')) {
+            return hws_graphql_bridge_slugify($value);
+        }
+        return sanitize_title($value);
+    }
+
+    // <meta name="description"> on vvd.su is a section-wide SEO blurb, identical across every
+    // product in a branch ("Электрические печи для бани на которые можно лить воду!..."), not
+    // product-specific text. The schema.org itemprop="description" meta (rendered inside the
+    // buy-block) carries a real per-product tagline instead — e.g. "ПАРиЖар Про: Эволюция
+    // Легенды." vvd.su product pages have no separate long-form body copy beyond this tagline
+    // (no "Описание" tab with prose — only the toggle-able characteristics table), so short and
+    // long description intentionally share the same real text rather than inventing marketing
+    // copy that isn't on the source page.
+    private static function extract_vvd_tagline(string $html): string {
+        if (preg_match('~itemprop=["\']description["\']\s+content=["\']([^"\']+)["\']~isu', $html, $m)) {
+            return trim(html_entity_decode(wp_strip_all_tags($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        }
+        return '';
+    }
+
     private static function vvd_has_offer_tree(string $html): bool {
         return str_contains($html, 'sku-props__inner');
     }
@@ -1671,8 +1700,8 @@ final class HWS_Product_Parser {
             'article'            => $article,
             'price'              => self::extract_price($html),
             'offer_image'        => self::extract_image($html, 'https://vvd.su/'),
-            'short_description'  => self::extract_meta_content($html, 'description'),
-            'long_description'   => self::extract_meta_content($html, 'description'),
+            'short_description'  => self::extract_vvd_tagline($html) ?: self::extract_meta_content($html, 'description'),
+            'long_description'   => self::extract_vvd_tagline($html),
             'characteristics'    => $chars,
             'fuel_type'          => $electric ? 'электричество' : 'дрова',
             'steam_volume'       => self::extract_vvd_steam_volume($html, $chars),
@@ -2473,7 +2502,7 @@ final class HWS_Product_Parser {
                 if ($label === '') {
                     continue;
                 }
-                $attr_values[sanitize_title($props[$prop_id]['title'])] = sanitize_title($label);
+                $attr_values[sanitize_title($props[$prop_id]['title'])] = self::hws_bridge_slugify($label);
                 $options_json[$props[$prop_id]['title']] = $label;
             }
             $variation->set_attributes($attr_values);
