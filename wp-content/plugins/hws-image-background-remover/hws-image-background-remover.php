@@ -19,6 +19,7 @@ final class HWS_Image_Background_Remover {
 		add_action( 'admin_menu', [ __CLASS__, 'admin_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ __CLASS__, 'admin_assets' ] );
 		add_action( 'wp_ajax_hws_ibr_status', [ __CLASS__, 'ajax_status' ] );
+		add_action( 'wp_ajax_hws_ibr_list', [ __CLASS__, 'ajax_list' ] );
 		add_action( 'wp_ajax_hws_ibr_start', [ __CLASS__, 'ajax_start' ] );
 		add_action( 'wp_ajax_hws_ibr_next', [ __CLASS__, 'ajax_next' ] );
 		add_action( 'wp_ajax_hws_ibr_reset', [ __CLASS__, 'ajax_reset' ] );
@@ -74,6 +75,16 @@ final class HWS_Image_Background_Remover {
 					</td>
 				</tr>
 			</table>
+			<div class="card" id="hws-ibr-checklist-wrap" style="max-width:100%;padding:16px;display:none">
+				<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+					<strong>Фото для обработки</strong>
+					<button type="button" class="button button-small" id="hws-ibr-select-all">Выбрать все</button>
+					<button type="button" class="button button-small" id="hws-ibr-select-none">Снять все</button>
+					<button type="button" class="button button-small" id="hws-ibr-select-unprocessed">Только необработанные</button>
+					<span id="hws-ibr-selected-count" style="color:#666"></span>
+				</div>
+				<div id="hws-ibr-checklist" style="max-height:480px;overflow:auto;border:1px solid #dcdcde;border-radius:4px;padding:8px;background:#fff"></div>
+			</div>
 			<div class="card" style="max-width:760px;padding:16px">
 				<p><strong>Всего:</strong> <span id="hws-ibr-total">0</span> &nbsp; <strong>Готово:</strong> <span id="hws-ibr-processed">0</span> &nbsp; <strong>Ошибки:</strong> <span id="hws-ibr-failed">0</span></p>
 				<div style="height:12px;background:#dcdcde;border-radius:6px;overflow:hidden"><div id="hws-ibr-bar" style="height:100%;width:0;background:#2271b1;transition:width .2s"></div></div>
@@ -86,6 +97,16 @@ final class HWS_Image_Background_Remover {
 				<pre id="hws-ibr-log" style="max-height:260px;overflow:auto;background:#1d2327;color:#fff;padding:12px"></pre>
 			</div>
 		</div>
+		<style>
+		.hws-ibr-product { margin-bottom:14px; }
+		.hws-ibr-product-name { font-weight:600; margin-bottom:6px; }
+		.hws-ibr-photos { display:flex; flex-wrap:wrap; gap:10px; }
+		.hws-ibr-photo { width:110px; text-align:center; font-size:11px; }
+		.hws-ibr-photo img { width:100px; height:100px; object-fit:contain; background:#f0f0f1; border:1px solid #dcdcde; border-radius:4px; display:block; margin-bottom:4px; }
+		.hws-ibr-photo.is-processed img { opacity:.45; }
+		.hws-ibr-photo label { display:block; cursor:pointer; }
+		.hws-ibr-photo .hws-ibr-badge { color:#2a7e2e; }
+		</style>
 		<script>
 		(function($){
 			var nonce = <?php echo wp_json_encode( wp_create_nonce( 'hws_ibr' ) ); ?>;
@@ -108,6 +129,54 @@ final class HWS_Image_Background_Remover {
 				$('#hws-ibr-failed').text(failed);
 				$('#hws-ibr-bar').css('width', (total ? Math.round((processed + failed) / total * 100) : 0) + '%');
 			}
+			function updateSelectedCount() {
+				var n = $('#hws-ibr-checklist input:checked').length;
+				$('#hws-ibr-selected-count').text(n ? ('выбрано: ' + n) : '');
+			}
+			function escHtml(s) {
+				return $('<span>').text(s == null ? '' : s).html();
+			}
+			function renderChecklist(products) {
+				var $list = $('#hws-ibr-checklist').empty();
+				if (!products.length) {
+					$list.append('<p style="color:#999">Для этого бренда нет изображений.</p>');
+					$('#hws-ibr-checklist-wrap').hide();
+					return;
+				}
+				products.forEach(function(product) {
+					var $block = $('<div class="hws-ibr-product">');
+					$block.append($('<div class="hws-ibr-product-name">').text(product.name));
+					var $photos = $('<div class="hws-ibr-photos">');
+					product.images.forEach(function(img) {
+						var $item = $('<div class="hws-ibr-photo">').toggleClass('is-processed', !!img.processed);
+						var $label = $('<label>');
+						var $cb = $('<input type="checkbox">')
+							.attr('data-key', img.key)
+							.prop('checked', !img.processed);
+						$label.append($cb);
+						$label.append($('<img loading="lazy">').attr('src', img.thumb || ''));
+						$label.append($('<div>').text(img.label || ''));
+						if (img.processed) {
+							$label.append($('<div class="hws-ibr-badge">').text('обработано'));
+						}
+						$item.append($label);
+						$photos.append($item);
+					});
+					$block.append($photos);
+					$list.append($block);
+				});
+				$('#hws-ibr-checklist-wrap').show();
+				updateSelectedCount();
+			}
+			function loadChecklist() {
+				if (!selectedBrand) { $('#hws-ibr-checklist-wrap').hide(); return; }
+				$('#hws-ibr-checklist').html('<p>Загрузка списка фото…</p>');
+				$('#hws-ibr-checklist-wrap').show();
+				request('hws_ibr_list').done(function(response){
+					if (!response.success) { log('Не удалось загрузить список фото.'); return; }
+					renderChecklist(response.data.products || []);
+				});
+			}
 			function status() {
 				if (!selectedBrand) { render({}); return; }
 				request('hws_ibr_status').done(function(response){
@@ -116,7 +185,7 @@ final class HWS_Image_Background_Remover {
 					$('#hws-ibr-message').text(
 						typeof response.data.pending !== 'undefined' && response.data.pending > 0
 							? 'Обработка остановлена. Нажмите «Запустить», чтобы продолжить.'
-							: (response.data.total ? 'Готово к запуску. Нажмите «Запустить».': 'Для бренда нет изображений.')
+							: 'Отметьте фото ниже и нажмите «Запустить».'
 					);
 				});
 			}
@@ -151,12 +220,35 @@ final class HWS_Image_Background_Remover {
 			$('#hws-ibr-brand').on('change', function(){
 				selectedBrand = $(this).val();
 				$('#hws-ibr-log').empty();
-				$('#hws-ibr-message').text(selectedBrand ? 'Готовим очередь…' : 'Выберите бренд.');
+				$('#hws-ibr-message').text(selectedBrand ? 'Готовим список…' : 'Выберите бренд.');
+				loadChecklist();
 				status();
+			});
+			$('#hws-ibr-checklist').on('change', 'input[type=checkbox]', updateSelectedCount);
+			$('#hws-ibr-select-all').on('click', function(){
+				$('#hws-ibr-checklist input[type=checkbox]').prop('checked', true);
+				updateSelectedCount();
+			});
+			$('#hws-ibr-select-none').on('click', function(){
+				$('#hws-ibr-checklist input[type=checkbox]').prop('checked', false);
+				updateSelectedCount();
+			});
+			$('#hws-ibr-select-unprocessed').on('click', function(){
+				$('#hws-ibr-checklist .hws-ibr-photo').each(function(){
+					$(this).find('input[type=checkbox]').prop('checked', !$(this).hasClass('is-processed'));
+				});
+				updateSelectedCount();
 			});
 			$('#hws-ibr-start').on('click', function(){
 				if (!selectedBrand) return;
-				request('hws_ibr_start').done(function(response){
+				var selected = $('#hws-ibr-checklist input[type=checkbox]:checked').map(function(){
+					return $(this).attr('data-key');
+				}).get();
+				if (!selected.length) {
+					$('#hws-ibr-message').text('Отметьте хотя бы одно фото.');
+					return;
+				}
+				request('hws_ibr_start', {selected: selected}).done(function(response){
 					if (!response.success) { log('Ошибка: ' + response.data); return; }
 					render(response.data);
 					running = true;
@@ -201,12 +293,42 @@ final class HWS_Image_Background_Remover {
 		wp_send_json_success( self::job_status( $job ) );
 	}
 
+	public static function ajax_list(): void {
+		$brand_id = self::check_request();
+		wp_send_json_success( [ 'products' => self::brand_image_entries( $brand_id ) ] );
+	}
+
 	public static function ajax_start(): void {
 		$brand_id = self::check_request();
 		if ( ! self::rembg_binary() ) {
 			wp_send_json_error( 'Локальная библиотека rembg не установлена.', 500 );
 		}
-		$queue = self::brand_queue( $brand_id );
+
+		// Build the run queue only from photos the admin actually ticked in the checklist —
+		// falls back to "everything for this brand" only if the client sent nothing at all
+		// (keeps old callers / the reset flow harmless, but a real checklist selection always
+		// takes priority).
+		$selected_keys = isset( $_POST['selected'] ) && is_array( $_POST['selected'] )
+			? array_map( 'sanitize_text_field', wp_unslash( $_POST['selected'] ) )
+			: null;
+
+		if ( null !== $selected_keys ) {
+			$selected_set = array_flip( $selected_keys );
+			$queue        = [];
+			foreach ( self::brand_image_entries( $brand_id ) as $product ) {
+				foreach ( $product['images'] as $image ) {
+					if ( ! isset( $selected_set[ $image['key'] ] ) ) {
+						continue;
+					}
+					$queue[] = 'source' === $image['type']
+						? [ 'type' => 'source', 'url' => $image['url'] ]
+						: [ 'type' => 'attachment', 'id' => $image['id'] ];
+				}
+			}
+		} else {
+			$queue = self::brand_queue( $brand_id );
+		}
+
 		$job = [
 			'brand'         => $brand_id,
 			'queue_version' => self::QUEUE_VERSION,
@@ -302,6 +424,99 @@ final class HWS_Image_Background_Remover {
 			}
 		}
 		return array_values( array_filter( array_unique( array_map( 'absint', $attachment_ids ) ) ) );
+	}
+
+	// Structured, per-product view of every processable image for a brand — thumbnail + product
+	// name + a stable key per photo, used to render the manual checklist UI so an admin can see
+	// and pick exactly which photos to run (instead of the old all-or-nothing brand queue).
+	private static function brand_image_entries( int $brand_id ): array {
+		if ( ! function_exists( 'wc_get_products' ) ) {
+			return [];
+		}
+		$product_ids = wc_get_products( [
+			'limit'     => -1,
+			'return'    => 'ids',
+			'status'    => [ 'publish', 'draft', 'pending', 'private' ],
+			'tax_query' => [ [
+				'taxonomy' => 'product_brand',
+				'field'    => 'term_id',
+				'terms'    => [ $brand_id ],
+			] ],
+		] );
+
+		$products_out = [];
+		foreach ( $product_ids as $product_id ) {
+			$product = wc_get_product( $product_id );
+			if ( ! $product ) {
+				continue;
+			}
+			$images = [];
+
+			if ( $product->get_image_id() ) {
+				$images[] = self::describe_attachment_entry( (int) $product->get_image_id(), 'Обложка' );
+			}
+			foreach ( $product->get_gallery_image_ids() as $gallery_id ) {
+				$images[] = self::describe_attachment_entry( (int) $gallery_id, 'Галерея' );
+			}
+
+			if ( $product->is_type( 'variable' ) ) {
+				foreach ( $product->get_children() as $variation_id ) {
+					$variation = wc_get_product( $variation_id );
+					if ( ! $variation ) {
+						continue;
+					}
+					$label = 'Вариант' . ( $variation->get_attribute_summary() ? ': ' . $variation->get_attribute_summary() : '' );
+					if ( $variation->get_image_id() ) {
+						$images[] = self::describe_attachment_entry( (int) $variation->get_image_id(), $label );
+						continue;
+					}
+					// Some variations only carry a not-yet-sideloaded source URL (legacy path).
+					$source_url = esc_url_raw( (string) get_post_meta( $variation_id, '_hws_source_image', true ) );
+					if ( $source_url && wp_http_validate_url( $source_url ) ) {
+						$images[] = [
+							'key'       => 's:' . md5( $source_url ),
+							'type'      => 'source',
+							'url'       => $source_url,
+							'thumb'     => $source_url,
+							'label'     => $label,
+							'processed' => (bool) self::source_attachment_id( $source_url ) && get_post_meta( self::source_attachment_id( $source_url ), self::PROCESSED_META, true ),
+						];
+					}
+				}
+			}
+
+			// Dedupe by key within the product (a variation can share its parent's cover photo).
+			$seen = [];
+			$images = array_values( array_filter( $images, function ( $img ) use ( &$seen ) {
+				if ( isset( $seen[ $img['key'] ] ) ) {
+					return false;
+				}
+				$seen[ $img['key'] ] = true;
+				return true;
+			} ) );
+
+			if ( ! $images ) {
+				continue;
+			}
+			$products_out[] = [
+				'id'     => $product_id,
+				'name'   => $product->get_name(),
+				'images' => $images,
+			];
+		}
+		return $products_out;
+	}
+
+	private static function describe_attachment_entry( int $attachment_id, string $label ): array {
+		$thumb = wp_get_attachment_image_url( $attachment_id, 'thumbnail' ) ?: wp_get_attachment_url( $attachment_id );
+		return [
+			'key'       => 'a:' . $attachment_id,
+			'type'      => 'attachment',
+			'id'        => $attachment_id,
+			'thumb'     => $thumb ?: '',
+			'label'     => $label,
+			'processed' => (bool) get_post_meta( $attachment_id, self::PROCESSED_META, true ),
+		];
 	}
 
 	private static function brand_queue( int $brand_id ): array {
