@@ -11,9 +11,34 @@ wp-content/wp-cache-config.php
 
 # OS
 .DS_Store
-wp-content/ai1wm-backups/
-db-backups/wordpress_latest.sql.gz
 
 # Backups — never track
 backups/
 db-backups/
+*.bak*
+.backups/
+.backup-*/
+wp-content/ai1wm-backups/
+
+# Third-party plugins (installed via WP, not tracked in git)
+wp-content/plugins/admin-menu-editor/
+wp-content/plugins/advanced-custom-fields-pro/
+wp-content/plugins/contact-form-7/
+wp-content/plugins/disable-gutenberg/
+wp-content/plugins/filebird/
+wp-content/plugins/image-optimization/
+wp-content/plugins/instagram-feed/
+wp-content/plugins/woocommerce/
+wp-content/plugins/woographql/
+wp-content/plugins/wordpress-seo/
+wp-content/plugins/wp-duplicate-page/
+wp-content/plugins/wp-graphql/
+
+# Third-party themes
+wp-content/themes/flavor*/
+wp-content/themes/flavor/
+wp-content/themes/flavor-flavor/
+
+# Temp files
+*.swp
+*~
